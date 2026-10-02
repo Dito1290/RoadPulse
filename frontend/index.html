@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoadPulse - Road Damage Classification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+</head>
+<body>
+    <div class="page-shell">
+        <header class="topbar">
+            <div class="brand-block">
+                <div class="brand-mark">RP</div>
+                <div class="brand-meta">
+                    <div class="brand-name">RoadPulse</div>
+                    <div class="brand-sub">BANDAR LAMPUNG</div>
+                </div>
+            </div>
+
+            <nav class="main-nav" aria-label="Main navigation">
+                <a href="#dashboard-section">Ringkasan</a>
+                <a href="#upload-section">Deteksi jalan</a>
+                <a href="#map-section">Peta</a>
+                <a href="#history-section">Riwayat</a>
+            </nav>
+
+            <div class="top-actions">
+                <div class="status-pill" id="apiStatus" role="status" aria-live="polite">
+                    <span class="dot"></span> Memeriksa API
+                </div>
+                <a class="mini-btn secondary" href="http://localhost:8000/admin/" target="_blank" rel="noreferrer">Admin</a>
+                <button class="mini-btn live" id="downloadReportBtn" type="button" disabled>Unduh CSV</button>
+            </div>
+        </header>
+
+        <main class="hero-layout">
+            <div class="hero-video-background" aria-hidden="true">
+                <video autoplay muted loop playsinline preload="metadata">
+                    <source src="assets/city-traffic-hero.mp4" type="video/mp4">
+                </video>
+            </div>
+            <div class="hero-overlay" aria-hidden="true"></div>
+
+            <div class="hero-copy">
+                <div class="eyebrow">KOTA BANDAR LAMPUNG</div>
+                <h1>
+                    Kondisi<br>
+                    <span class="hero-word">jalan rusak</span><br>
+                    di Bandar Lampung.
+                </h1>
+
+                <div class="location-tag">Lampung • Smart Road Monitoring</div>
+
+                <p>
+                    Satu alur monitoring untuk deteksi retakan, lubang, erosi, dan klasifikasi kondisi permukaan jalan di kota Bandar Lampung secara otomatis.
+                </p>
+
+                <button class="cta-btn" id="startDetectionBtn" type="button">Mulai deteksi</button>
+            </div>
+
+            <div class="hero-video-credit">Footage: Marc Espejo / Pexels</div>
+        </main>
+
+        <section class="upload-section" id="upload-section">
+            <div class="section-heading">
+                <span class="eyebrow">Inspection</span>
+                <h2>Upload Road Image</h2>
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-placeholder">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p>Drag and drop an image here or click to browse</p>
+                    <input type="file" id="fileInput" accept="image/jpeg,image/png" capture="environment" hidden>
+                </div>
+                <div class="preview-area" id="previewArea" style="display: none;">
+                    <img id="previewImage" src="" alt="Preview">
+                    <button class="btn btn-secondary" id="changeImageBtn">Change Image</button>
+                </div>
+            </div>
+
+            <div class="capture-details" id="captureDetails" hidden>
+                <div>
+                    <span>Waktu foto</span>
+                    <strong id="photoCapturedAt">Belum diketahui</strong>
+                </div>
+                <div>
+                    <span>Lokasi foto</span>
+                    <strong id="photoLocation">GPS belum diambil</strong>
+                </div>
+                <button class="mini-btn secondary" id="getLocationBtn" type="button">Ambil lokasi GPS</button>
+            </div>
+
+            <button class="btn btn-primary" id="classifyBtn" disabled>Classify Image</button>
+            <p class="upload-message" id="uploadMessage" role="status" aria-live="polite"></p>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing image...</p>
+            </div>
+        </section>
+
+        <section class="result-section" id="resultSection" style="display: none;">
+            <div class="section-heading">
+                <span class="eyebrow">Result</span>
+                <h2>Classification Result</h2>
+            </div>
+            <div class="result-card" id="resultCard">
+                <div class="result-label" id="resultLabel"></div>
+                <div class="result-confidence" id="resultConfidence"></div>
+                <div class="result-meta" id="resultMeta"></div>
+                <div class="result-location" id="resultLocation"></div>
+            </div>
+        </section>
+
+        <section class="dashboard-section" id="dashboard-section">
+            <div class="section-heading">
+                <span class="eyebrow">Overview</span>
+                <h2>Dashboard Statistics</h2>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total</span>
+                    <h3 id="totalInspections">0</h3>
+                    <p>Inspections</p>
+                </div>
+                <div class="stat-card crack">
+                    <span class="stat-label">Crack</span>
+                    <h3 id="crackCount">0</h3>
+                    <p>Detected</p>
+                </div>
+                <div class="stat-card pothole">
+                    <span class="stat-label">Pothole</span>
+                    <h3 id="potholeCount">0</h3>
+                    <p>Detected</p>
+                </div>
+                <div class="stat-card erosion">
+                    <span class="stat-label">Erosion</span>
+                    <h3 id="erosionCount">0</h3>
+                    <p>Detected</p>
+                </div>
+                <div class="stat-card normal">
+                    <span class="stat-label">Normal</span>
+                    <h3 id="normalCount">0</h3>
+                    <p>Detected</p>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="distributionChart"></canvas>
+            </div>
+        </section>
+
+        <section class="map-section" id="map-section">
+            <div class="section-heading">
+                <span class="eyebrow">Pemetaan inspeksi</span>
+                <h2>Lokasi foto jalan</h2>
+            </div>
+            <p class="map-status" id="mapStatus" role="status">Memuat titik lokasi...</p>
+            <div id="inspectionMap" aria-label="Peta lokasi foto inspeksi jalan Bandar Lampung"></div>
+            <p class="map-attribution">Peta © OpenStreetMap contributors</p>
+        </section>
+
+        <section class="history-section" id="history-section">
+            <div class="section-heading">
+                <span class="eyebrow">Data inspeksi</span>
+                <h2>Riwayat unggahan</h2>
+            </div>
+            <div class="history-toolbar">
+                <p id="historySummary" role="status">Memuat riwayat...</p>
+                <div class="history-pagination">
+                    <button class="mini-btn secondary" id="historyPrevious" type="button" disabled aria-label="Halaman sebelumnya">Sebelumnya</button>
+                    <span id="historyPageLabel">Halaman 1</span>
+                    <button class="mini-btn secondary" id="historyNext" type="button" disabled aria-label="Halaman berikutnya">Berikutnya</button>
+                </div>
+            </div>
+            <div class="history-table-wrap">
+                <table class="history-table">
+                    <thead>
+                        <tr><th>Gambar</th><th>Kelas</th><th>Keyakinan</th><th>Waktu foto / analisis</th><th>Lokasi jalan</th></tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr><td colspan="5">Memuat riwayat...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/dashboard.js?v=2"></script>
+</body>
+</html>

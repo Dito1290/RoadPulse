@@ -1,0 +1,9 @@
+backend/venv311/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pt
+*.h5
+Dataset*
+.DS_Store
