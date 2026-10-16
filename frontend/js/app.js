@@ -32,6 +32,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboard();
 });
 
+
+function authFetch(url, options = {}) {
+  const token = localStorage.getItem('rp_token');
+  if (!token) { window.location.href = 'login.html'; return Promise.reject(new Error('Belum login')); }
+  options.headers = { ...(options.headers || {}), Authorization: `Token ${token}` };
+  return fetch(url, options).then((res) => {
+    if (res.status === 401) { localStorage.removeItem('rp_token'); window.location.href = 'login.html'; }
+    return res;
+  });
+}
 function setupEventListeners() {
     // Upload area click
     uploadArea.addEventListener('click', () => {
@@ -81,9 +91,15 @@ function setupEventListeners() {
         }
     });
 
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+        localStorage.removeItem('rp_token');
+        window.location.href = 'login.html';
+    });
+
     document.getElementById('startDetectionBtn').addEventListener('click', () => {
         document.getElementById('upload-section').scrollIntoView({ behavior: 'smooth' });
     });
+    
 }
 
 async function handleFileSelect(file) {

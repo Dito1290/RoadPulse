@@ -7,3 +7,6 @@ __pycache__/
 *.h5
 Dataset*
 .DS_Store
+
+.venv/
+node_modules/

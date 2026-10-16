@@ -7,7 +7,24 @@ from .models import InspectionRecord
 from .serializers import InspectionRecordSerializer, ClassifyRequestSerializer
 from ai_model.model_loader import ModelUnavailableError, predict_image
 from ai_model.preprocessor import validate_image
+from django.contrib.auth import authenticate
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny
 
+class LoginView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        user = authenticate(
+            username=request.data.get('username'),
+            password=request.data.get('password'),
+        )
+        if not user:
+            return Response({'error': 'Username atau kata sandi salah'},
+                            status=status.HTTP_401_UNAUTHORIZED)
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key, 'username': user.username})
 
 class ClassifyView(APIView):
     """

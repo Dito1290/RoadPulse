@@ -4,6 +4,7 @@ from .views import (
     DashboardStatsView,
     InspectionHistoryView,
     InspectionMapView,
+    LoginView,
 )
 
 urlpatterns = [
@@ -11,4 +12,5 @@ urlpatterns = [
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('dashboard/history/', InspectionHistoryView.as_view(), name='dashboard-history'),
     path('dashboard/map/', InspectionMapView.as_view(), name='dashboard-map'),
+    path('auth/login/', LoginView.as_view(), name='login'),
 ]

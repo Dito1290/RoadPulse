@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masuk - RoadPulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/login.css">
+</head>
+<body>
+    <section class="left">
+        <div class="brand">
+            <div class="mark">RP</div>
+            <div>
+                <div class="bn">RoadPulse</div>
+                <div class="bs">Bandar Lampung</div>
+            </div>
+        </div>
+        <div>
+            <div class="eyebrow">KOTA BANDAR LAMPUNG</div>
+            <h1>Pantau kondisi<br><span>jalan kota</span><br>dalam satu panel.</h1>
+            <div class="tag">Lampung • Smart Road Monitoring</div>
+            <p class="d">Masuk untuk mengelola deteksi retakan, lubang, dan erosi permukaan jalan secara otomatis.</p>
+        </div>
+        <div class="credit">Foto: Tugu Adipura, Bandar Lampung</div>
+    </section>
+
+    <section class="right">
+        <form class="card" id="loginForm" novalidate>
+            <div class="ey">MASUK</div>
+            <h2>Selamat datang kembali</h2>
+            <p class="sub">Masuk ke dashboard RoadPulse untuk melanjutkan inspeksi.</p>
+
+            <div class="field">
+                <label for="username">Username</label>
+                <div class="in">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2f7568" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                    <input id="username" name="username" type="text" placeholder="Masukkan username" autocomplete="username" required>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="password">Kata sandi</label>
+                <div class="in">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4b5863" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    <input id="password" name="password" type="password" placeholder="Masukkan kata sandi" autocomplete="current-password" required>
+                    <button type="button" class="eye" id="togglePassword" aria-label="Tampilkan kata sandi">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4b5863" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <p class="error" id="loginError" role="alert" hidden></p>
+
+            <button class="btn" id="loginBtn" type="submit">Masuk</button>
+            <p class="foot">Belum punya akun? <b>Hubungi admin</b></p>
+        </form>
+    </section>
+
+    <script src="js/login.js"></script>
+</body>
+</html>

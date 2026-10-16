@@ -1,0 +1,140 @@
+:root {
+    --primary: #234d44;
+    --green-strong: #2f7568;
+    --green-ink: #163f36;
+    --text: #0f1720;
+    --text-soft: #4b5863;
+    --danger: #d85a5a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    min-height: 100vh;
+    display: flex;
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: #dfe6e4;
+    color: var(--text);
+}
+
+button, input { font: inherit; }
+
+/* Panel kiri */
+.left {
+    flex: 1.1;
+    position: relative;
+    background: url('../assets/tugu-adipura-hero.webp') center / cover;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40px 52px;
+    color: #fff;
+}
+.left::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, rgba(10, 30, 26, .55), rgba(10, 30, 26, .85));
+}
+.left > * { position: relative; }
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.mark {
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #edf8f3, #dfeee8);
+    color: var(--primary);
+    font-weight: 800; font-size: .95rem;
+}
+.bn { font-weight: 800; font-size: 1.15rem; letter-spacing: -.05em; }
+.bs { font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; opacity: .75; }
+
+.eyebrow { font-size: .75rem; letter-spacing: .2em; opacity: .8; margin-bottom: 18px; }
+h1 { font-size: clamp(2.2rem, 3.6vw, 3.4rem); line-height: 1.08; font-weight: 700; letter-spacing: -.03em; }
+h1 span { color: #9fd8c6; }
+.tag {
+    display: inline-block;
+    margin: 22px 0 14px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .2);
+    font-size: .85rem;
+}
+.d { max-width: 520px; line-height: 1.7; color: rgba(226, 234, 244, .8); font-size: 1.02rem; }
+.credit { font-size: .7rem; opacity: .6; }
+
+/* Panel kanan */
+.right {
+    flex: .9;
+    display: grid;
+    place-items: center;
+    background: #edf2ef;
+    padding: 40px 24px;
+}
+.card {
+    width: 100%;
+    max-width: 440px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 44px 40px;
+    border: 1px solid rgba(16, 25, 19, .08);
+    box-shadow: 0 30px 60px -30px rgba(12, 25, 20, .35);
+}
+.ey { font-size: .72rem; letter-spacing: .2em; color: var(--green-strong); font-weight: 600; }
+.card h2 { font-size: 2rem; margin: 8px 0 6px; font-weight: 700; letter-spacing: -.03em; color: var(--green-ink); }
+.sub { color: var(--text-soft); font-size: .95rem; margin-bottom: 28px; }
+
+label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: 8px; }
+.field { margin-bottom: 18px; }
+
+.in {
+    display: flex; align-items: center; gap: 10px;
+    height: 52px; padding: 0 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(16, 25, 19, .14);
+    background: #f7faf9;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.in:focus-within {
+    border-color: var(--green-strong);
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(47, 117, 104, .12);
+}
+.in svg { flex: none; }
+.in input {
+    flex: 1; min-width: 0;
+    border: none; outline: none; background: transparent;
+    color: var(--text); font-size: .95rem;
+}
+.eye { border: none; background: none; cursor: pointer; display: grid; place-items: center; }
+
+.error {
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(216, 90, 90, .1);
+    border: 1px solid rgba(216, 90, 90, .3);
+    color: #a33a3a;
+    font-size: .88rem;
+}
+
+.btn {
+    width: 100%; height: 54px;
+    border: none; border-radius: 16px;
+    font-weight: 700; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--green-strong));
+    box-shadow: 0 16px 28px -18px rgba(35, 77, 68, .9);
+    transition: transform .2s, opacity .2s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+.foot { text-align: center; font-size: .88rem; color: var(--text-soft); margin-top: 24px; }
+.foot b { color: var(--green-strong); }
+
+@media (max-width: 900px) {
+    .left { display: none; }
+    .right { flex: 1; }
+}
