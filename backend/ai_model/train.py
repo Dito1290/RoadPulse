@@ -22,7 +22,7 @@ from torchvision import datasets, transforms, models
 BASE_DIR    = Path(__file__).resolve().parent           # backend/ai_model/
 BACKEND_DIR = BASE_DIR.parent                           # backend/
 PROJECT_DIR = BACKEND_DIR.parent                        # RoadPulse/
-DATASET_DIR = PROJECT_DIR / "dataset"
+DATASET_DIR = PROJECT_DIR / "Dataset"
 SAVE_PATH   = BASE_DIR / "mobilenetv2_road_damage.pt"
 
 # ── Hyperparameters ───────────────────────────────────────────

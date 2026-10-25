@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#102b26">
+    <title>RoadPulse | Backend API</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Inter, "Segoe UI", sans-serif;
+            color: #192b27;
+            background: #f3f6f2;
+            font-synthesis: none;
+        }
+
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        a { color: inherit; }
+
+        .page {
+            width: min(1080px, calc(100% - 40px));
+            margin: 0 auto;
+            padding: 52px 0 36px;
+        }
+
+        .topbar, .brand, .actions, .endpoint-heading, .footer {
+            display: flex;
+            align-items: center;
+        }
+
+        .topbar, .endpoint-heading, .footer { justify-content: space-between; }
+        .brand { gap: 12px; }
+        .brand-mark {
+            display: grid;
+            width: 44px;
+            height: 44px;
+            place-items: center;
+            border-radius: 14px;
+            background: #d3f0a2;
+            color: #18352c;
+            font-size: 14px;
+            font-weight: 800;
+        }
+        .brand-name { font-size: 17px; font-weight: 750; letter-spacing: -.03em; }
+        .brand-sub { margin-top: 3px; color: #728078; font-size: 11px; letter-spacing: .12em; }
+        .actions { gap: 10px; }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+            padding: 0 15px;
+            border: 1px solid #dce5dc;
+            border-radius: 10px;
+            background: #fff;
+            color: #34443d;
+            font-size: 13px;
+            font-weight: 650;
+            text-decoration: none;
+        }
+        .button.primary { border-color: #183a31; background: #183a31; color: #fff; }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            margin-top: 48px;
+            padding: clamp(30px, 6vw, 64px);
+            border-radius: 24px;
+            background: #102b26;
+            color: #f7fbf5;
+        }
+        .hero::after {
+            position: absolute;
+            right: -95px;
+            bottom: -225px;
+            width: 440px;
+            height: 440px;
+            border: 1px solid rgb(211 240 162 / 20%);
+            border-radius: 50%;
+            box-shadow: 0 0 0 42px rgb(211 240 162 / 5%), 0 0 0 88px rgb(211 240 162 / 4%);
+            content: "";
+            pointer-events: none;
+        }
+        .eyebrow { color: #c0e68b; font-size: 11px; font-weight: 750; letter-spacing: .16em; }
+        h1 { max-width: 620px; margin: 18px 0 12px; font-size: clamp(36px, 6vw, 62px); letter-spacing: -.055em; line-height: 1.04; }
+        .hero p { max-width: 590px; margin: 0; color: #c4d2ca; font-size: 16px; line-height: 1.7; }
+        .hero .button { position: relative; z-index: 1; margin-top: 27px; }
+
+        .section-heading { margin: 38px 0 15px; }
+        .section-heading h2 { margin: 0; font-size: 21px; letter-spacing: -.035em; }
+        .section-heading p { margin: 5px 0 0; color: #718078; font-size: 13px; }
+        .endpoint-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .endpoint {
+            min-height: 122px;
+            padding: 19px;
+            border: 1px solid #e0e8df;
+            border-radius: 15px;
+            background: #fff;
+        }
+        .endpoint-heading { gap: 12px; }
+        .method {
+            padding: 5px 8px;
+            border-radius: 6px;
+            background: #e7f4d7;
+            color: #41611f;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .06em;
+        }
+        .method.post { background: #fff0d8; color: #8a5a16; }
+        .endpoint code { color: #273b33; font-size: 12px; overflow-wrap: anywhere; }
+        .endpoint h3 { margin: 14px 0 4px; font-size: 14px; }
+        .endpoint p { margin: 0; color: #75827a; font-size: 12px; line-height: 1.5; }
+        .endpoint a { text-decoration-color: #bdc9bf; text-underline-offset: 3px; }
+        .hint {
+            margin-top: 18px;
+            padding: 16px 18px;
+            border: 1px solid #e4e9e1;
+            border-radius: 12px;
+            color: #65736a;
+            background: #edf2eb;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .hint strong { color: #30443a; }
+        .footer { margin-top: 32px; color: #7b877f; font-size: 12px; }
+
+        @media (max-width: 620px) {
+            .page { width: min(100% - 28px, 1080px); padding-top: 22px; }
+            .topbar { align-items: flex-start; gap: 16px; }
+            .actions { flex-direction: column; align-items: stretch; }
+            .actions .button { min-height: 36px; }
+            .hero { margin-top: 26px; border-radius: 18px; }
+            .endpoint-grid { grid-template-columns: 1fr; }
+            .footer { align-items: flex-start; gap: 8px; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">RP</div>
+                <div>
+                    <div class="brand-name">RoadPulse</div>
+                    <div class="brand-sub">ROAD MONITORING API</div>
+                </div>
+            </div>
+            <nav class="actions" aria-label="Navigasi backend">
+                <a class="button primary" href="/api/docs/">Swagger</a>
+                <a class="button" href="/api/redoc/">ReDoc</a>
+                <a class="button" href="/api/v1/">API JSON</a>
+                <a class="button" href="/admin/">Admin</a>
+            </nav>
+        </header>
+
+        <section class="hero">
+            <div class="eyebrow">BACKEND AKTIF · API VERSI 1</div>
+            <h1>Data kondisi jalan, terhubung.</h1>
+            <p>
+                Backend RoadPulse menerima foto inspeksi, menjalankan klasifikasi,
+                dan menyediakan statistik, riwayat, serta titik lokasi untuk dashboard.
+            </p>
+            <a class="button" href="/api/v1/dashboard/stats/">Lihat statistik API</a>
+        </section>
+
+        <section aria-labelledby="endpoints-title">
+            <div class="section-heading">
+                <h2 id="endpoints-title">Endpoint tersedia</h2>
+                <p>Endpoint GET dapat dibuka langsung. Endpoint POST menerima data dari aplikasi.</p>
+            </div>
+            <div class="endpoint-grid">
+                <article class="endpoint">
+                    <div class="endpoint-heading">
+                        <span class="method post">POST</span>
+                        <code>/api/v1/classify/</code>
+                    </div>
+                    <h3>Klasifikasi gambar</h3>
+                    <p>Unggah foto jalan untuk mendapatkan label kerusakan dan skor keyakinan.</p>
+                </article>
+                <article class="endpoint">
+                    <div class="endpoint-heading">
+                        <span class="method">GET</span>
+                        <code><a href="/api/v1/dashboard/stats/">/api/v1/dashboard/stats/</a></code>
+                    </div>
+                    <h3>Statistik dashboard</h3>
+                    <p>Jumlah inspeksi, distribusi kelas, dan data inspeksi terbaru.</p>
+                </article>
+                <article class="endpoint">
+                    <div class="endpoint-heading">
+                        <span class="method">GET</span>
+                        <code><a href="/api/v1/dashboard/history/">/api/v1/dashboard/history/</a></code>
+                    </div>
+                    <h3>Riwayat inspeksi</h3>
+                    <p>Daftar inspeksi dengan paginasi untuk tabel dashboard.</p>
+                </article>
+                <article class="endpoint">
+                    <div class="endpoint-heading">
+                        <span class="method">GET</span>
+                        <code><a href="/api/v1/dashboard/map/">/api/v1/dashboard/map/</a></code>
+                    </div>
+                    <h3>Data peta</h3>
+                    <p>Inspeksi yang memiliki koordinat GPS untuk ditampilkan pada peta.</p>
+                </article>
+                <article class="endpoint">
+                    <div class="endpoint-heading">
+                        <span class="method post">POST</span>
+                        <code>/api/v1/auth/login/</code>
+                    </div>
+                    <h3>Autentikasi</h3>
+                    <p>Masuk menggunakan username dan kata sandi untuk memperoleh token API.</p>
+                </article>
+            </div>
+        </section>
+
+        <aside class="hint">
+            <strong>Dokumentasi API:</strong>
+            gunakan <a href="/api/docs/">Swagger UI</a> untuk mencoba request,
+            <a href="/api/redoc/">ReDoc</a> untuk membaca dokumentasi, atau
+            <a href="/api/schema/">OpenAPI JSON</a> untuk mengunduh schema.
+            <br><br>
+            <strong>Ingin membuka dashboard visual?</strong>
+            Jalankan frontend dari folder <code>frontend</code> dengan
+            <code>python -m http.server 3000</code>, lalu buka
+            <code>http://localhost:3000</code>. Halaman ini adalah portal API backend.
+        </aside>
+
+        <footer class="footer">
+            <span>RoadPulse · Bandar Lampung</span>
+            <span>Schema: <a href="/api/schema/">/api/schema/</a></span>
+        </footer>
+    </main>
+</body>
+</html>

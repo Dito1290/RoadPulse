@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.http import JsonResponse
 from django.db.models import Count
 from django.core.paginator import Paginator
 from .models import InspectionRecord
@@ -10,11 +11,46 @@ from ai_model.preprocessor import validate_image
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from .serializers import (
+    DashboardStatsResponseSerializer,
+    ErrorResponseSerializer,
+    InspectionHistoryResponseSerializer,
+    InspectionMapPointSerializer,
+    LoginRequestSerializer,
+    LoginResponseSerializer,
+)
+
+
+def api_v1_root(_request):
+    return JsonResponse({
+        'message': 'RoadPulse API is running',
+        'endpoints': {
+            'classify': '/api/v1/classify/',
+            'dashboard_stats': '/api/v1/dashboard/stats/',
+            'dashboard_history': '/api/v1/dashboard/history/',
+            'dashboard_map': '/api/v1/dashboard/map/',
+            'login': '/api/v1/auth/login/',
+            'openapi_schema': '/api/schema/',
+            'swagger_ui': '/api/docs/',
+            'redoc': '/api/redoc/',
+        },
+    })
+
 
 class LoginView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        operation_id='login',
+        summary='Masuk dan memperoleh token API',
+        request=LoginRequestSerializer,
+        responses={
+            200: LoginResponseSerializer,
+            401: OpenApiResponse(response=ErrorResponseSerializer, description='Username atau kata sandi salah.'),
+        },
+    )
     def post(self, request):
         user = authenticate(
             username=request.data.get('username'),
@@ -32,6 +68,20 @@ class ClassifyView(APIView):
     POST /api/v1/classify/
     """
     
+    @extend_schema(
+        operation_id='classifyImage',
+        summary='Klasifikasikan gambar kondisi jalan',
+        description='Unggah gambar JPEG/PNG (maksimal 10 MB). Data GPS dan waktu foto bersifat opsional.',
+        request={
+            'multipart/form-data': ClassifyRequestSerializer,
+        },
+        responses={
+            201: InspectionRecordSerializer,
+            400: OpenApiResponse(response=ErrorResponseSerializer, description='Data atau gambar tidak valid.'),
+            503: OpenApiResponse(response=ErrorResponseSerializer, description='Model klasifikasi belum tersedia.'),
+            500: OpenApiResponse(description='Terjadi kesalahan saat melakukan prediksi.'),
+        },
+    )
     def post(self, request):
         # Validate request data
         serializer = ClassifyRequestSerializer(data=request.data)
@@ -101,6 +151,11 @@ class DashboardStatsView(APIView):
     GET /api/v1/dashboard/stats/
     """
     
+    @extend_schema(
+        operation_id='getDashboardStats',
+        summary='Ambil statistik dashboard',
+        responses=DashboardStatsResponseSerializer,
+    )
     def get(self, request):
         # Get total inspections
         total_inspections = InspectionRecord.objects.count()
@@ -133,6 +188,14 @@ class DashboardStatsView(APIView):
 class InspectionHistoryView(APIView):
     """Return a page of saved inspections for the dashboard history table."""
 
+    @extend_schema(
+        operation_id='getInspectionHistory',
+        summary='Ambil riwayat inspeksi',
+        parameters=[
+            OpenApiParameter(name='page', type=int, location=OpenApiParameter.QUERY, description='Nomor halaman.'),
+        ],
+        responses=InspectionHistoryResponseSerializer,
+    )
     def get(self, request):
         page = Paginator(InspectionRecord.objects.all(), 10).get_page(
             request.query_params.get('page', 1)
@@ -151,6 +214,11 @@ class InspectionHistoryView(APIView):
 class InspectionMapView(APIView):
     """Return recent geotagged inspections for the dashboard map."""
 
+    @extend_schema(
+        operation_id='getInspectionMap',
+        summary='Ambil titik inspeksi untuk peta',
+        responses={200: InspectionMapPointSerializer(many=True)},
+    )
     def get(self, request):
         points = InspectionRecord.objects.exclude(
             latitude__isnull=True

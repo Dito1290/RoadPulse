@@ -5,9 +5,11 @@ from .views import (
     InspectionHistoryView,
     InspectionMapView,
     LoginView,
+    api_v1_root,
 )
 
 urlpatterns = [
+    path('', api_v1_root, name='api-v1-root'),
     path('classify/', ClassifyView.as_view(), name='classify'),
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('dashboard/history/', InspectionHistoryView.as_view(), name='dashboard-history'),
