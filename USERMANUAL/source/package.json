@@ -1,0 +1,15 @@
+{
+  "name": "roadpulse-usermanual",
+  "private": true,
+  "description": "Pembangkit User Manual RoadPulse (PDF lewat render.js, Word lewat docx.js)",
+  "scripts": {
+    "pdf": "node render.js",
+    "docx": "node docx.js",
+    "all": "node render.js && node docx.js"
+  },
+  "dependencies": {
+    "docx": "^9.0.0",
+    "image-size": "^1.1.1",
+    "node-html-parser": "^6.1.13"
+  }
+}

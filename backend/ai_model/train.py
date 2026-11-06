@@ -1,233 +1,252 @@
 """
 MobileNetV2 Training Script for RoadPulse
 Trains on 4 classes: Crack, Normal, Pothole, Surface Erosion
-Saves best model as mobilenetv2_road_damage.pt
 
 Usage (dari folder backend/):
-  source venv311/bin/activate
-  python ai_model/train.py
+  venv311/bin/python ai_model/train.py                        # latih -> ai_model/mobilenetv2_road_damage.candidate.pt
+  venv311/bin/python ai_model/train.py --eval ai_model/mobilenetv2_road_damage.pt   # evaluasi model mana pun
+
+Model baru disimpan sebagai *kandidat* dan TIDAK menimpa model yang dipakai server.
+Bandingkan hasil --eval, lalu salin kandidat ke mobilenetv2_road_damage.pt bila lebih baik.
+
+Perbaikan dibanding versi awal (fokus recall kelas Pothole):
+  - Augmentasi lebih kuat: RandomResizedCrop, perspektif, blur, kecerahan/kontras lebar (meniru jalan basah,
+    bayangan, malam), RandomErasing.
+  - Bobot kelas (inverse frequency) + label smoothing pada loss.
+  - Fine-tuning seluruh layer lebih lama dengan AdamW + cosine LR.
+  - Checkpoint terbaik dipilih dari balanced accuracy (rata-rata recall per kelas), bukan akurasi total,
+    agar kelas yang lemah tidak dikorbankan.
+  - Split validasi sama dengan versi awal (80/20, seed 42) sehingga hasilnya dapat dibandingkan langsung.
 """
-import os
+import argparse
+import json
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms, models
+from torch.utils.data import DataLoader, Subset, random_split
+from torchvision import datasets, models, transforms
 
 # ── Path setup ────────────────────────────────────────────────
 BASE_DIR    = Path(__file__).resolve().parent           # backend/ai_model/
 BACKEND_DIR = BASE_DIR.parent                           # backend/
 PROJECT_DIR = BACKEND_DIR.parent                        # RoadPulse/
-DATASET_DIR = PROJECT_DIR / "Dataset"
-SAVE_PATH   = BASE_DIR / "mobilenetv2_road_damage.pt"
+DATASET_DIR = PROJECT_DIR / "dataset"
+LIVE_PATH   = BASE_DIR / "mobilenetv2_road_damage.pt"
+CANDIDATE   = BASE_DIR / "mobilenetv2_road_damage.candidate.pt"
 
 # ── Hyperparameters ───────────────────────────────────────────
-BATCH_SIZE   = 32
-NUM_EPOCHS   = 8
-LR           = 1e-3
-LR_FINETUNE  = 1e-4
-IMG_SIZE     = 224
-NUM_CLASSES  = 4
+BATCH_SIZE  = 32
+IMG_SIZE    = 224
+NUM_CLASSES = 4
+MEAN, STD   = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+SEED        = 42
 
 
 def get_transforms():
     train_tf = transforms.Compose([
-        transforms.Resize((IMG_SIZE + 32, IMG_SIZE + 32)),
-        transforms.RandomCrop(IMG_SIZE),
+        transforms.RandomResizedCrop(IMG_SIZE, scale=(0.55, 1.0), ratio=(0.75, 1.33)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(p=0.2),
-        transforms.RandomRotation(20),
-        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2),
+        transforms.RandomApply([transforms.RandomPerspective(distortion_scale=0.3, p=1.0)], p=0.3),
+        transforms.RandomRotation(15),
+        transforms.ColorJitter(brightness=0.45, contrast=0.4, saturation=0.3, hue=0.03),
+        transforms.RandomGrayscale(p=0.05),
+        transforms.RandomApply([transforms.GaussianBlur(5, sigma=(0.1, 1.8))], p=0.2),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225]),
+        transforms.Normalize(MEAN, STD),
+        transforms.RandomErasing(p=0.2, scale=(0.02, 0.12)),
     ])
     val_tf = transforms.Compose([
         transforms.Resize((IMG_SIZE, IMG_SIZE)),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225]),
+        transforms.Normalize(MEAN, STD),
     ])
     return train_tf, val_tf
 
 
-def build_model():
-    try:
-        weights = models.MobileNet_V2_Weights.DEFAULT
-        model = models.mobilenet_v2(weights=weights)
-    except Exception:
-        model = models.mobilenet_v2(pretrained=True)
-
-    # Freeze feature extractor
-    for param in model.features.parameters():
-        param.requires_grad = False
-
-    in_features = model.classifier[1].in_features
+def build_model(pretrained=True):
+    if pretrained:
+        try:
+            model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
+        except Exception:
+            model = models.mobilenet_v2(pretrained=True)
+    else:
+        model = models.mobilenet_v2(weights=None)
     model.classifier = nn.Sequential(
         nn.Dropout(p=0.3),
-        nn.Linear(in_features, NUM_CLASSES),
+        nn.Linear(model.last_channel, NUM_CLASSES),
     )
     return model
 
 
-def evaluate(model, loader, criterion, device):
-    model.eval()
-    total_loss, correct, total = 0.0, 0, 0
-    with torch.no_grad():
-        for imgs, labels in loader:
-            imgs, labels = imgs.to(device), labels.to(device)
-            out  = model(imgs)
-            loss = criterion(out, labels)
-            total_loss += loss.item() * imgs.size(0)
-            preds = out.argmax(dim=1)
-            correct += (preds == labels).sum().item()
-            total   += labels.size(0)
-    return total_loss / total, correct / total
+def get_device():
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
 
 
-def train():
-    print(f"\n{'='*55}")
-    print(f"  RoadPulse – MobileNetV2 Training")
-    print(f"  Dataset  : {DATASET_DIR}")
-    print(f"  Save to  : {SAVE_PATH}")
-    print(f"{'='*55}\n")
-
+def make_splits():
+    """Split 80/20 identik dengan versi awal (seed 42) — validasi tetap 377 gambar yang sama."""
     if not DATASET_DIR.exists():
         print(f"[ERROR] Dataset tidak ditemukan: {DATASET_DIR}")
-        print("Pastikan folder dataset/ ada di root RoadPulse/")
         sys.exit(1)
-
-    # ── Device ────────────────────────────────────────────────
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-    print(f"Device: {device}\n")
-
-    # ── Dataset ───────────────────────────────────────────────
     train_tf, val_tf = get_transforms()
-    full_ds = datasets.ImageFolder(str(DATASET_DIR), transform=train_tf)
-    classes = full_ds.classes
-    print(f"Kelas ditemukan  : {classes}")
-    print(f"Total gambar     : {len(full_ds)}")
+    base = datasets.ImageFolder(str(DATASET_DIR))
+    n_train = int(0.8 * len(base))
+    tr, vl = random_split(range(len(base)), [n_train, len(base) - n_train],
+                          generator=torch.Generator().manual_seed(SEED))
+    train_ds = Subset(datasets.ImageFolder(str(DATASET_DIR), transform=train_tf), list(tr))
+    val_ds = Subset(datasets.ImageFolder(str(DATASET_DIR), transform=val_tf), list(vl))
+    return base.classes, base.targets, train_ds, val_ds
 
-    train_n = int(0.8 * len(full_ds))
-    val_n   = len(full_ds) - train_n
-    train_ds, val_ds = random_split(full_ds, [train_n, val_n],
-                                    generator=torch.Generator().manual_seed(42))
 
-    # Apply val transform to val split
-    val_ds.dataset = datasets.ImageFolder(str(DATASET_DIR), transform=val_tf)
+def evaluate(model, loader, device, classes):
+    """Akurasi, recall per kelas, balanced accuracy, dan confusion matrix (baris = label asli)."""
+    model.eval()
+    k = len(classes)
+    cm = [[0] * k for _ in range(k)]
+    with torch.no_grad():
+        for imgs, labels in loader:
+            preds = model(imgs.to(device)).argmax(1).cpu()
+            for t, p in zip(labels.tolist(), preds.tolist()):
+                cm[t][p] += 1
+    total = sum(map(sum, cm))
+    correct = sum(cm[i][i] for i in range(k))
+    recall = {classes[i]: cm[i][i] / max(1, sum(cm[i])) for i in range(k)}
+    precision = {classes[j]: cm[j][j] / max(1, sum(cm[i][j] for i in range(k))) for j in range(k)}
+    return {
+        'accuracy': correct / total,
+        'balanced_accuracy': sum(recall.values()) / k,
+        'recall': recall,
+        'precision': precision,
+        'confusion_matrix': cm,
+        'classes': classes,
+        'n_val': total,
+    }
 
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=0, pin_memory=False)
-    val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=False)
-    print(f"Train: {train_n} | Val: {val_n}\n")
 
-    # ── Model ─────────────────────────────────────────────────
-    model     = build_model().to(device)
-    criterion = nn.CrossEntropyLoss()
+def print_report(title, m):
+    print(f"\n{title}")
+    print(f"  Akurasi          : {m['accuracy'] * 100:.1f}%  ({m['n_val']} gambar validasi)")
+    print(f"  Balanced accuracy: {m['balanced_accuracy'] * 100:.1f}%")
+    for c in m['classes']:
+        print(f"  {c:<16} recall {m['recall'][c] * 100:5.1f}%   precision {m['precision'][c] * 100:5.1f}%")
+    print("  Confusion matrix (baris = asli, kolom = prediksi):", m['classes'])
+    for c, row in zip(m['classes'], m['confusion_matrix']):
+        print(f"    {c:<16} {row}")
 
-    # Phase 1: train hanya classifier head
-    optimizer = optim.Adam(model.classifier.parameters(), lr=LR)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.5)
 
-    best_val_acc = 0.0
-    print(f"{'─'*55}")
-    print(f"Phase 1 – Training classifier head ({NUM_EPOCHS} epochs)")
-    print(f"{'─'*55}")
+def load_checkpoint(path, device):
+    ckpt = torch.load(path, map_location=device, weights_only=False)
+    model = build_model(pretrained=False)
+    model.load_state_dict(ckpt['model_state_dict'])
+    return model.to(device), ckpt
 
-    for epoch in range(NUM_EPOCHS):
+
+def run_epoch(model, loader, criterion, optimizer, device, scheduler=None):
+    model.train()
+    run_loss, correct, total = 0.0, 0, 0
+    for imgs, labels in loader:
+        imgs, labels = imgs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        out = model(imgs)
+        loss = criterion(out, labels)
+        loss.backward()
+        optimizer.step()
+        if scheduler:
+            scheduler.step()
+        run_loss += loss.item() * imgs.size(0)
+        correct += (out.argmax(1) == labels).sum().item()
+        total += labels.size(0)
+    return run_loss / total, correct / total
+
+
+def train(args):
+    torch.manual_seed(SEED)
+    device = get_device()
+    classes, targets, train_ds, val_ds = make_splits()
+    print(f"Device: {device} | Kelas: {classes} | Train {len(train_ds)} | Val {len(val_ds)}")
+
+    # Bobot kelas dari distribusi data latih (kelas sedikit -> bobot lebih besar)
+    counts = Counter(targets[i] for i in train_ds.indices)
+    weights = torch.tensor([len(train_ds) / (NUM_CLASSES * counts[i]) for i in range(NUM_CLASSES)], dtype=torch.float)
+    print("Jumlah latih per kelas:", {classes[i]: counts[i] for i in range(NUM_CLASSES)})
+    print("Bobot loss           :", {classes[i]: round(w, 2) for i, w in enumerate(weights.tolist())})
+    criterion = nn.CrossEntropyLoss(weight=weights.to(device), label_smoothing=0.05)
+
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=args.workers,
+                              persistent_workers=args.workers > 0)
+    val_loader = DataLoader(val_ds, batch_size=64, shuffle=False, num_workers=args.workers,
+                            persistent_workers=args.workers > 0)
+
+    model = build_model().to(device)
+    best = {'balanced_accuracy': -1}
+
+    def maybe_save(tag):
+        nonlocal best
+        m = evaluate(model, val_loader, device, classes)
+        better = (m['balanced_accuracy'], m['accuracy']) > (best['balanced_accuracy'], best.get('accuracy', 0))
+        print(f"  {tag}  Val acc {m['accuracy'] * 100:.1f}%  bal {m['balanced_accuracy'] * 100:.1f}%  "
+              f"Pothole {m['recall']['Pothole'] * 100:.1f}%" + ("  ← terbaik, disimpan" if better else ""), flush=True)
+        if better:
+            best = m
+            torch.save({'model_state_dict': model.state_dict(), 'classes': classes,
+                        'val_acc': m['accuracy'], 'metrics': m}, args.out)
+
+    # Fase 1: hanya classifier head (feature extractor beku)
+    for p in model.features.parameters():
+        p.requires_grad = False
+    opt = optim.AdamW(model.classifier.parameters(), lr=1e-3, weight_decay=1e-4)
+    for ep in range(args.head_epochs):
         t0 = time.time()
-        model.train()
-        run_loss, correct, total = 0.0, 0, 0
+        loss, acc = run_epoch(model, train_loader, criterion, opt, device)
+        print(f"Head {ep + 1}/{args.head_epochs} [{time.time() - t0:.0f}s] train acc {acc * 100:.1f}% loss {loss:.3f}", flush=True)
+        maybe_save(f"head{ep + 1}")
 
-        for imgs, labels in train_loader:
-            imgs, labels = imgs.to(device), labels.to(device)
-            optimizer.zero_grad()
-            out  = model(imgs)
-            loss = criterion(out, labels)
-            loss.backward()
-            optimizer.step()
-
-            run_loss += loss.item() * imgs.size(0)
-            correct  += (out.argmax(1) == labels).sum().item()
-            total    += labels.size(0)
-
-        scheduler.step()
-        tr_loss = run_loss / total
-        tr_acc  = correct  / total
-        vl_loss, vl_acc = evaluate(model, val_loader, criterion, device)
-        elapsed = time.time() - t0
-
-        print(f"Epoch {epoch+1:02d}/{NUM_EPOCHS}  [{elapsed:.0f}s]  "
-              f"Train {tr_acc*100:.1f}% loss={tr_loss:.4f}  "
-              f"Val {vl_acc*100:.1f}% loss={vl_loss:.4f}", end="")
-
-        if vl_acc > best_val_acc:
-            best_val_acc = vl_acc
-            torch.save({
-                'model_state_dict': model.state_dict(),
-                'classes': classes,
-                'val_acc': best_val_acc,
-            }, SAVE_PATH)
-            print(f"  ← saved ✓")
-        else:
-            print()
-
-    # Phase 2: fine-tune semua layer
-    print(f"\n{'─'*55}")
-    print(f"Phase 2 – Fine-tuning all layers (3 epochs)")
-    print(f"{'─'*55}")
-    for param in model.features.parameters():
-        param.requires_grad = True
-    optimizer2 = optim.Adam(model.parameters(), lr=LR_FINETUNE)
-
-    for epoch in range(3):
+    # Fase 2: fine-tune seluruh layer, cosine LR
+    for p in model.features.parameters():
+        p.requires_grad = True
+    opt = optim.AdamW([
+        {'params': model.features.parameters(), 'lr': 2e-4},
+        {'params': model.classifier.parameters(), 'lr': 5e-4},
+    ], weight_decay=1e-4)
+    sched = optim.lr_scheduler.OneCycleLR(opt, max_lr=[2e-4, 5e-4], total_steps=args.ft_epochs * len(train_loader),
+                                          pct_start=0.15)
+    for ep in range(args.ft_epochs):
         t0 = time.time()
-        model.train()
-        run_loss, correct, total = 0.0, 0, 0
-        for imgs, labels in train_loader:
-            imgs, labels = imgs.to(device), labels.to(device)
-            optimizer2.zero_grad()
-            out  = model(imgs)
-            loss = criterion(out, labels)
-            loss.backward()
-            optimizer2.step()
-            run_loss += loss.item() * imgs.size(0)
-            correct  += (out.argmax(1) == labels).sum().item()
-            total    += labels.size(0)
+        loss, acc = run_epoch(model, train_loader, criterion, opt, device, sched)
+        print(f"FT {ep + 1}/{args.ft_epochs} [{time.time() - t0:.0f}s] train acc {acc * 100:.1f}% loss {loss:.3f}", flush=True)
+        maybe_save(f"ft{ep + 1}")
 
-        tr_loss = run_loss / total
-        tr_acc  = correct / total
-        vl_loss, vl_acc = evaluate(model, val_loader, criterion, device)
-        elapsed = time.time() - t0
+    print_report(f"Model terbaik disimpan di {args.out}", best)
+    Path(args.out).with_suffix('.metrics.json').write_text(json.dumps(best, indent=2))
 
-        print(f"FT Epoch {epoch+1}/3  [{elapsed:.0f}s]  "
-              f"Train {tr_acc*100:.1f}%  Val {vl_acc*100:.1f}%", end="")
 
-        if vl_acc > best_val_acc:
-            best_val_acc = vl_acc
-            torch.save({
-                'model_state_dict': model.state_dict(),
-                'classes': classes,
-                'val_acc': best_val_acc,
-            }, SAVE_PATH)
-            print(f"  ← saved ✓")
-        else:
-            print()
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--eval', metavar='CHECKPOINT', help='hanya evaluasi checkpoint pada split validasi')
+    ap.add_argument('--out', default=str(CANDIDATE), help='lokasi simpan model hasil latih')
+    ap.add_argument('--head-epochs', type=int, default=4)
+    ap.add_argument('--ft-epochs', type=int, default=10)
+    ap.add_argument('--workers', type=int, default=2)
+    args = ap.parse_args()
 
-    print(f"\n{'='*55}")
-    print(f"Training selesai!")
-    print(f"Best Val Accuracy: {best_val_acc*100:.1f}%")
-    print(f"Model disimpan di: {SAVE_PATH}")
-    print(f"{'='*55}\n")
+    if args.eval:
+        device = get_device()
+        classes, _, _, val_ds = make_splits()
+        model, _ = load_checkpoint(args.eval, device)
+        m = evaluate(model, DataLoader(val_ds, batch_size=64, num_workers=args.workers), device, classes)
+        print_report(f"Evaluasi {args.eval}", m)
+        return
+    train(args)
 
 
 if __name__ == "__main__":
-    train()
+    main()

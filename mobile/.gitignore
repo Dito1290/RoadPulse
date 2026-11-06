@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# env lokal (berisi konfigurasi mesin masing-masing)
+.env

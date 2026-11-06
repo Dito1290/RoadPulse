@@ -20,7 +20,37 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-roadpulse-dev-key-change-i
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 # Allowed Hosts configuration
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*').split(',') if h.strip()]
+
+
+def _lan_ips():
+    """IP LAN komputer saat ini (berubah tiap ganti Wi-Fi/hotspot)."""
+    import socket
+    ips = set()
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(('10.255.255.255', 1))  # tidak mengirim paket; hanya memilih interface
+            ips.add(s.getsockname()[0])
+    except OSError:
+        pass
+    try:
+        ips.update(socket.gethostbyname_ex(socket.gethostname())[2])
+    except OSError:
+        pass
+    return sorted(ip for ip in ips if not ip.startswith('127.'))
+
+
+# Mode development: HP & browser lain di LAN memanggil lewat proxy dengan Host = IP LAN komputer.
+# Proxy meneruskan Host asli agar CSRF Django Admin cocok, jadi IP LAN perlu diizinkan.
+# IP dibaca ulang tiap request, bukan sekali saat start, supaya pindah Wi-Fi/hotspot tidak butuh restart.
+class _HostsWithLan(list):
+    def __iter__(self):
+        yield from list.__iter__(self)
+        yield from _lan_ips()
+
+
+if DEBUG and '*' not in ALLOWED_HOSTS and os.getenv('ALLOW_LAN_HOSTS', 'True') == 'True':
+    ALLOWED_HOSTS = _HostsWithLan(ALLOWED_HOSTS)
 
 
 # Application definition
@@ -76,16 +106,27 @@ WSGI_APPLICATION = 'roadpulse.wsgi.application'
 
 
 # Database Configuration (PostgreSQL with .env fallback)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'roadpulse_db'),
-        'USER': os.getenv('DB_USER', 'postgres'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', '127.0.0.1'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+# DB_ENGINE=sqlite memakai SQLite lokal (SQLITE_PATH, default backend/db.sqlite3).
+DB_ENGINE = os.getenv('DB_ENGINE', 'postgresql').lower()
+
+if DB_ENGINE in ('sqlite', 'sqlite3'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.getenv('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3')),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'roadpulse_db'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', '127.0.0.1'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
 
 
 # Password validation
@@ -126,7 +167,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework settings
-# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_RENDERER_CLASSES': [
@@ -138,13 +178,24 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
         'rest_framework.parsers.FormParser',
     ],
+    # Token dulu agar client mobile/frontend menerima 401 + WWW-Authenticate,
+    # Session tetap untuk Browsable API & admin.
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',  # Mengizinkan akses publik ke root API & Admin
     ],
+    # Batas percobaan per IP (lihat throttle_scope di LoginView/RegisterView).
+    # NUM_PROXIES=1: IP client dibaca dari X-Forwarded-For yang diisi backend/proxy.js.
+    'DEFAULT_THROTTLE_RATES': {
+        'login': os.getenv('THROTTLE_LOGIN', '10/min'),
+        'register': os.getenv('THROTTLE_REGISTER', '5/hour'),
+    },
+    'NUM_PROXIES': 1,
+    # Semua error API (termasuk error tak terduga) dikembalikan sebagai JSON.
+    'EXCEPTION_HANDLER': 'api.exceptions.json_exception_handler',
 }
 
 SPECTACULAR_SETTINGS = {

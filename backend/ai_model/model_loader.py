@@ -13,37 +13,15 @@ _classes = None
 _torch = None
 
 
-def _normalize_checkpoint_classes(classes):
-    """Normalize class names to the app's canonical order.
-
-    ImageFolder sorts class folders alphabetically, which produces a different
-    label index order than the one used by the UI and dataset docs. Reorder the
-    saved classifier head so predictions match the canonical order used across
-    the app.
-    """
-    if not classes:
-        return classes
-
-    ordered = list(classes)
-    if list(ordered) == EXPECTED_CLASSES:
-        return ordered
-
-    class_set = set(ordered)
-    if set(EXPECTED_CLASSES) != class_set:
-        return ordered
-
-    return EXPECTED_CLASSES
-
-
 def _is_pothole_like(image_path):
     """Fallback for wet/muddy pothole photos that the base model labels as Normal."""
     try:
-        from PIL import Image
+        from PIL import Image, ImageOps
     except ImportError:
         return False
 
     try:
-        image = Image.open(image_path).convert('L').resize((512, 512))
+        image = ImageOps.exif_transpose(Image.open(image_path)).convert('L').resize((512, 512))
     except Exception:
         return False
 
@@ -121,15 +99,16 @@ def load_model():
     )
     try:
         checkpoint = torch.load(MODEL_PATH, map_location=device, weights_only=False)
-        classes = checkpoint['classes']
-        canonical_classes = _normalize_checkpoint_classes(classes)
-        if set(canonical_classes) != set(EXPECTED_CLASSES):
+        # Index output model mengikuti urutan 'classes' di checkpoint
+        # (ImageFolder: alfabetis), jadi label dipakai apa adanya.
+        classes = list(checkpoint['classes'])
+        if set(classes) != set(EXPECTED_CLASSES):
             raise ValueError(f'Unexpected model classes: {classes}')
 
         model = models.mobilenet_v2(weights=None)
         model.classifier = torch.nn.Sequential(
             torch.nn.Dropout(p=0.3),
-            torch.nn.Linear(model.last_channel, len(canonical_classes)),
+            torch.nn.Linear(model.last_channel, len(classes)),
         )
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
@@ -137,7 +116,7 @@ def load_model():
     except (KeyError, OSError, RuntimeError, ValueError) as error:
         raise ModelUnavailableError(f'Could not load trained model: {error}') from error
 
-    _model, _classes, _torch = model, canonical_classes, torch
+    _model, _classes, _torch = model, classes, torch
     return _model, _classes, _torch
 
 

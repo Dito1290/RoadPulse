@@ -63,3 +63,44 @@ class InspectionMapPointSerializer(serializers.Serializer):
     location_name = serializers.CharField()
     captured_at = serializers.DateTimeField(allow_null=True)
     created_at = serializers.DateTimeField()
+
+
+class RegisterRequestSerializer(serializers.Serializer):
+    """Pendaftaran akun pengguna biasa (bukan staff/admin)."""
+    username = serializers.RegexField(
+        r'^[A-Za-z0-9_.]+$', min_length=3, max_length=30,
+        error_messages={
+            'invalid': 'Username hanya boleh huruf, angka, titik, dan garis bawah.',
+            'min_length': 'Username minimal 3 karakter.',
+            'max_length': 'Username maksimal 30 karakter.',
+            'required': 'Username wajib diisi.',
+            'blank': 'Username wajib diisi.',
+        },
+    )
+    password = serializers.CharField(write_only=True, error_messages={'required': 'Kata sandi wajib diisi.', 'blank': 'Kata sandi wajib diisi.'})
+    password_confirm = serializers.CharField(write_only=True, error_messages={'required': 'Ulangi kata sandi.', 'blank': 'Ulangi kata sandi.'})
+
+    def validate_username(self, value):
+        from django.contrib.auth.models import User
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError('Username sudah dipakai. Coba yang lain.')
+        return value
+
+    def validate(self, attrs):
+        from django.contrib.auth.models import User
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.utils import translation
+
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({'password_confirm': 'Kata sandi tidak sama.'})
+        try:
+            with translation.override('id'):
+                validate_password(attrs['password'], user=User(username=attrs['username']))
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': list(exc.messages)})
+        return attrs
+
+
+class RegisterResponseSerializer(LoginResponseSerializer):
+    pass

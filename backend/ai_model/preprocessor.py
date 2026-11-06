@@ -1,7 +1,7 @@
 """
 Image preprocessing utilities
 """
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 import numpy as np
 
 
@@ -21,6 +21,9 @@ def preprocess_image(image_file, target_size=(224, 224)):
         img = Image.open(image_file)
     else:
         img = Image.open(image_file)
+
+    # Foto HP sering hanya menyimpan rotasi di EXIF
+    img = ImageOps.exif_transpose(img)
     
     # Convert to RGB if necessary
     if img.mode != 'RGB':

@@ -1,5 +1,4 @@
-// Configuration
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// Configuration: API_BASE_URL berasal dari js/config.js
 
 // DOM Elements
 const uploadArea = document.getElementById('uploadArea');
@@ -104,12 +103,12 @@ function setupEventListeners() {
 
 async function handleFileSelect(file) {
     if (!file || !file.type.match('image.*')) {
-        alert('Please select a valid image file (JPEG or PNG)');
+        uploadMessage.textContent = 'Pilih file gambar JPEG atau PNG.';
         return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB');
+        uploadMessage.textContent = 'Ukuran foto maksimal 10 MB.';
         return;
     }
 
@@ -238,7 +237,8 @@ async function classifyImage() {
             body: formData
         });
 
-        const result = await response.json();
+        let result = {};
+        try { result = await response.json(); } catch (_) { /* respons bukan JSON */ }
         if (!response.ok) {
             throw new Error(result.error || result.detail || 'Klasifikasi gagal. Periksa server dan model.');
         }
@@ -247,8 +247,10 @@ async function classifyImage() {
         await loadDashboard(1);
 
     } catch (error) {
-        console.error('Error:', error);
-        uploadMessage.textContent = error.message || 'Tidak dapat terhubung ke API. Pastikan backend Django berjalan di port 8000.';
+        console.error('Klasifikasi gagal:', error);
+        uploadMessage.textContent = error instanceof TypeError
+            ? 'Tidak dapat terhubung ke server. Pastikan backend berjalan (./start.sh).'
+            : (error.message || 'Klasifikasi gagal. Coba lagi.');
     } finally {
         loading.style.display = 'none';
         classifyBtn.disabled = !selectedFile;
@@ -261,8 +263,14 @@ function displayResult(result) {
     resultCard.className = 'result-card ' + className;
 
     // Display label and confidence
-    resultLabel.textContent = result.class_label;
-    resultConfidence.textContent = `Confidence: ${(result.confidence_score * 100).toFixed(1)}%`;
+    resultLabel.textContent = classLabel(result.class_label);
+    resultConfidence.textContent = `Tingkat keyakinan: ${(result.confidence_score * 100).toFixed(1)}%`;
+    const warning = document.getElementById('resultWarning');
+    const low = result.confidence_score < LOW_CONFIDENCE;
+    warning.hidden = !low;
+    warning.textContent = low
+        ? 'Hasil kurang yakin, sebaiknya foto ulang. Ambil foto lebih dekat ke permukaan jalan, cukup terang, tidak buram, dan kerusakan berada di tengah bingkai.'
+        : '';
 
     // Display metadata
     const capturedAt = result.captured_at || selectedCapturedAt;

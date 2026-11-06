@@ -11,6 +11,11 @@ from ai_model.preprocessor import validate_image
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
+from rest_framework.throttling import ScopedRateThrottle
+from django.db import DatabaseError
+import logging
+
+logger = logging.getLogger(__name__)
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from .serializers import (
     DashboardStatsResponseSerializer,
@@ -19,6 +24,8 @@ from .serializers import (
     InspectionMapPointSerializer,
     LoginRequestSerializer,
     LoginResponseSerializer,
+    RegisterRequestSerializer,
+    RegisterResponseSerializer,
 )
 
 
@@ -31,6 +38,7 @@ def api_v1_root(_request):
             'dashboard_history': '/api/v1/dashboard/history/',
             'dashboard_map': '/api/v1/dashboard/map/',
             'login': '/api/v1/auth/login/',
+            'register': '/api/v1/auth/register/',
             'openapi_schema': '/api/schema/',
             'swagger_ui': '/api/docs/',
             'redoc': '/api/redoc/',
@@ -41,6 +49,8 @@ def api_v1_root(_request):
 class LoginView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     @extend_schema(
         operation_id='login',
@@ -62,11 +72,42 @@ class LoginView(APIView):
         token, _ = Token.objects.get_or_create(user=user)
         return Response({'token': token.key, 'username': user.username})
 
+
+class RegisterView(APIView):
+    """Membuat akun pengguna biasa lalu langsung mengembalikan token (tanpa hak staff/admin)."""
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
+
+    @extend_schema(
+        operation_id='register',
+        summary='Daftar akun baru dan memperoleh token API',
+        request=RegisterRequestSerializer,
+        responses={
+            201: RegisterResponseSerializer,
+            400: OpenApiResponse(response=ErrorResponseSerializer, description='Data pendaftaran tidak valid.'),
+        },
+    )
+    def post(self, request):
+        from django.contrib.auth.models import User
+
+        serializer = RegisterRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            fields = {k: [str(m) for m in (v if isinstance(v, list) else [v])] for k, v in serializer.errors.items()}
+            first = next(iter(fields.values()))[0]
+            return Response({'error': first, 'fields': fields}, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+        user = User.objects.create_user(username=data['username'], password=data['password'])
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key, 'username': user.username}, status=status.HTTP_201_CREATED)
+
 class ClassifyView(APIView):
     """
     API endpoint for image classification
     POST /api/v1/classify/
     """
+    permission_classes = [AllowAny]
     
     @extend_schema(
         operation_id='classifyImage',
@@ -115,7 +156,14 @@ class ClassifyView(APIView):
             class_label='Processing',  # Temporary
             confidence_score=0.0
         )
-        inspection.save()
+        try:
+            inspection.save()
+        except (DatabaseError, OSError) as e:
+            logger.exception('Gagal menyimpan inspeksi')
+            return Response(
+                {'error': 'Gagal menyimpan data inspeksi ke database. Coba lagi nanti.', 'details': str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
         
         try:
             # Get prediction from AI model
@@ -138,7 +186,11 @@ class ClassifyView(APIView):
             )
         except Exception as e:
             # Clean up if prediction fails
-            inspection.delete()
+            logger.exception('Prediksi gagal')
+            try:
+                inspection.delete()
+            except DatabaseError:
+                pass
             return Response(
                 {'error': 'Prediction failed', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -150,6 +202,7 @@ class DashboardStatsView(APIView):
     API endpoint for dashboard statistics
     GET /api/v1/dashboard/stats/
     """
+    permission_classes = [AllowAny]
     
     @extend_schema(
         operation_id='getDashboardStats',
@@ -187,6 +240,7 @@ class DashboardStatsView(APIView):
 
 class InspectionHistoryView(APIView):
     """Return a page of saved inspections for the dashboard history table."""
+    permission_classes = [AllowAny]
 
     @extend_schema(
         operation_id='getInspectionHistory',
@@ -213,6 +267,7 @@ class InspectionHistoryView(APIView):
 
 class InspectionMapView(APIView):
     """Return recent geotagged inspections for the dashboard map."""
+    permission_classes = [AllowAny]
 
     @extend_schema(
         operation_id='getInspectionMap',

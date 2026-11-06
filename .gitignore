@@ -10,3 +10,15 @@ Dataset*
 
 .venv/
 node_modules/
+
+# Konfigurasi lokal & data pengguna (jangan di-commit)
+.env
+.env.*
+!.env.example
+backend/db_backups/
+backend/media/uploads/
+
+# Log start.sh
+.logs/
+backend/db.sqlite3
+USERMANUAL/arsip/

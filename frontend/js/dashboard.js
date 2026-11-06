@@ -69,7 +69,7 @@ function updateInspectionMap(points) {
         const popup = document.createElement('div');
         popup.className = 'map-popup';
         const title = document.createElement('strong');
-        title.textContent = point.class_label;
+        title.textContent = classLabel(point.class_label);
         const location = document.createElement('span');
         location.textContent = point.location_name ||
             `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
@@ -123,7 +123,7 @@ function updateChart(distribution) {
     distributionChart = new Chart(canvas.getContext('2d'), {
         type: 'bar',
         data: {
-            labels: ['Crack', 'Pothole', 'Surface Erosion', 'Normal'],
+            labels: ['Retakan', 'Lubang', 'Erosi permukaan', 'Normal'],
             datasets: [{
                 label: 'Jumlah deteksi',
                 data: [
@@ -189,8 +189,13 @@ function renderHistory(data) {
         } else {
             imageCell.textContent = '-';
         }
-        row.insertCell().textContent = record.class_label;
-        row.insertCell().textContent = `${(record.confidence_score * 100).toFixed(1)}%`;
+        row.insertCell().textContent = classLabel(record.class_label);
+        const confCell = row.insertCell();
+        confCell.textContent = `${(record.confidence_score * 100).toFixed(1)}%`;
+        if (record.confidence_score < LOW_CONFIDENCE) {
+            confCell.classList.add('low-confidence');
+            confCell.title = 'Keyakinan di bawah 50%: hasil sebaiknya dicek ulang';
+        }
         const timeCell = row.insertCell();
         const photoTime = record.captured_at
             ? new Date(record.captured_at).toLocaleString('id-ID')

@@ -5,17 +5,18 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "RoadPulse needs access to your camera to capture road images.",
-        "NSLocationWhenInUseUsageDescription": "RoadPulse needs your location to record where photos were taken."
-      }
+        "NSCameraUsageDescription": "RoadPulse memakai kamera untuk memotret kondisi permukaan jalan.",
+        "NSLocationWhenInUseUsageDescription": "RoadPulse memakai lokasi untuk mencatat titik foto jalan di peta."
+      },
+      "bundleIdentifier": "id.ac.polinela.roadpulse"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#2563eb",
+        "backgroundColor": "#20C997",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -24,7 +25,8 @@
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "id.ac.polinela.roadpulse"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,15 +35,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow RoadPulse to access your camera."
+          "cameraPermission": "Izinkan RoadPulse memakai kamera untuk memotret kondisi jalan."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow RoadPulse to use your location."
+          "locationAlwaysAndWhenInUsePermission": "Izinkan RoadPulse memakai lokasi untuk mencatat titik foto jalan."
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-video"
     ]
   }
 }

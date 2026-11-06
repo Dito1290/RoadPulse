@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RoadPulse - Road Damage Classification</title>
+    <title>RoadPulse - Deteksi Kerusakan Jalan</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -35,7 +35,7 @@
                 <div class="status-pill" id="apiStatus" role="status" aria-live="polite">
                     <span class="dot"></span> Memeriksa API
                 </div>
-                <a class="mini-btn secondary" href="http://localhost:8000/admin/" target="_blank" rel="noreferrer">Admin</a>
+                <a class="mini-btn secondary" href="http://localhost:8000/admin/" data-api-href="/admin/" target="_blank" rel="noreferrer">Admin</a>
                 <button class="mini-btn live" id="downloadReportBtn" type="button" disabled>Unduh CSV</button>
                 <button class="mini-btn secondary" id="logoutBtn" type="button">Keluar</button>
             </div>
@@ -71,8 +71,8 @@
 
         <section class="upload-section" id="upload-section">
             <div class="section-heading">
-                <span class="eyebrow">Inspection</span>
-                <h2>Upload Road Image</h2>
+                <span class="eyebrow">Inspeksi</span>
+                <h2>Unggah foto jalan</h2>
             </div>
 
             <div class="upload-area" id="uploadArea">
@@ -82,12 +82,12 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <p>Drag and drop an image here or click to browse</p>
+                    <p>Seret foto jalan ke sini atau klik untuk memilih (JPEG/PNG, maks. 10 MB)</p>
                     <input type="file" id="fileInput" accept="image/jpeg,image/png" capture="environment" hidden>
                 </div>
                 <div class="preview-area" id="previewArea" style="display: none;">
-                    <img id="previewImage" src="" alt="Preview">
-                    <button class="btn btn-secondary" id="changeImageBtn">Change Image</button>
+                    <img id="previewImage" src="" alt="Pratinjau foto jalan">
+                    <button class="btn btn-secondary" id="changeImageBtn">Ganti foto</button>
                 </div>
             </div>
 
@@ -103,59 +103,60 @@
                 <button class="mini-btn secondary" id="getLocationBtn" type="button">Ambil lokasi GPS</button>
             </div>
 
-            <button class="btn btn-primary" id="classifyBtn" disabled>Classify Image</button>
+            <button class="btn btn-primary" id="classifyBtn" disabled>Analisis foto</button>
             <p class="upload-message" id="uploadMessage" role="status" aria-live="polite"></p>
 
             <div class="loading" id="loading" style="display: none;">
                 <div class="spinner"></div>
-                <p>Analyzing image...</p>
+                <p>Menganalisis gambar…</p>
             </div>
         </section>
 
         <section class="result-section" id="resultSection" style="display: none;">
             <div class="section-heading">
-                <span class="eyebrow">Result</span>
-                <h2>Classification Result</h2>
+                <span class="eyebrow">Hasil</span>
+                <h2>Hasil klasifikasi</h2>
             </div>
             <div class="result-card" id="resultCard">
                 <div class="result-label" id="resultLabel"></div>
                 <div class="result-confidence" id="resultConfidence"></div>
                 <div class="result-meta" id="resultMeta"></div>
                 <div class="result-location" id="resultLocation"></div>
+                <div class="result-warning" id="resultWarning" role="alert" hidden></div>
             </div>
         </section>
 
         <section class="dashboard-section" id="dashboard-section">
             <div class="section-heading">
-                <span class="eyebrow">Overview</span>
-                <h2>Dashboard Statistics</h2>
+                <span class="eyebrow">Ringkasan</span>
+                <h2>Statistik inspeksi</h2>
             </div>
 
             <div class="stats-grid">
                 <div class="stat-card">
                     <span class="stat-label">Total</span>
                     <h3 id="totalInspections">0</h3>
-                    <p>Inspections</p>
+                    <p>Inspeksi</p>
                 </div>
                 <div class="stat-card crack">
-                    <span class="stat-label">Crack</span>
+                    <span class="stat-label">Retakan</span>
                     <h3 id="crackCount">0</h3>
-                    <p>Detected</p>
+                    <p>Terdeteksi</p>
                 </div>
                 <div class="stat-card pothole">
-                    <span class="stat-label">Pothole</span>
+                    <span class="stat-label">Lubang</span>
                     <h3 id="potholeCount">0</h3>
-                    <p>Detected</p>
+                    <p>Terdeteksi</p>
                 </div>
                 <div class="stat-card erosion">
-                    <span class="stat-label">Erosion</span>
+                    <span class="stat-label">Erosi permukaan</span>
                     <h3 id="erosionCount">0</h3>
-                    <p>Detected</p>
+                    <p>Terdeteksi</p>
                 </div>
                 <div class="stat-card normal">
                     <span class="stat-label">Normal</span>
                     <h3 id="normalCount">0</h3>
-                    <p>Detected</p>
+                    <p>Terdeteksi</p>
                 </div>
             </div>
 
@@ -200,6 +201,7 @@
         </section>
     </div>
 
+    <script src="js/config.js"></script>
     <script src="js/app.js"></script>
     <script src="js/dashboard.js?v=2"></script>
 </body>

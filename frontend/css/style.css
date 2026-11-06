@@ -832,3 +832,11 @@ h2 {
     .capture-details { grid-template-columns: 1fr; }
     #inspectionMap { height: 300px; }
 }
+
+/* Peringatan keyakinan rendah (< 50 %) */
+.result-warning {
+    margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+    background: rgba(209, 174, 85, .16); border: 1px solid rgba(209, 174, 85, .55);
+    color: #7a5a10; font-size: .92rem; line-height: 1.5;
+}
+.low-confidence { color: #9a6a00; font-weight: 700; }

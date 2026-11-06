@@ -1,6 +1,6 @@
 # 🛣️ RoadPulse - AI-Powered Road Damage Classification System
 
-RoadPulse adalah sistem AI lengkap untuk mendeteksi dan mengklasifikasikan kerusakan jalan menggunakan computer vision. Sistem terdiri dari Django REST API backend, web dashboard, dan mobile application untuk inspeksi lapangan.
+RoadPulse adalah sistem AI untuk mendeteksi dan mengklasifikasikan kerusakan jalan di Bandar Lampung menggunakan computer vision. Sistem terdiri dari Django REST API backend (dengan model MobileNetV2 PyTorch), proxy API Node.js, web dashboard, dan aplikasi mobile Expo untuk inspeksi lapangan.
 
 ## 🎯 Fitur Utama
 
@@ -9,124 +9,266 @@ RoadPulse adalah sistem AI lengkap untuk mendeteksi dan mengklasifikasikan kerus
   - 🔴 **Pothole** - Lubang pada permukaan jalan
   - 🟡 **Surface Erosion** - Pengikisan permukaan jalan
   - 🟢 **Normal** - Tidak ada kerusakan terlihat
+- **Web Dashboard**: Upload gambar (GPS & waktu dibaca dari EXIF), statistik Chart.js, riwayat, dan peta Leaflet
+- **Mobile App**: Ambil foto dengan kamera + koordinat GPS di lapangan, ringkasan dan riwayat inspeksi
+- **Dokumentasi API**: Swagger UI / ReDoc / OpenAPI (drf-spectacular)
 
-- **Web Dashboard**: Upload gambar dan lihat statistik dengan grafik interaktif
-- **Mobile App**: Ambil foto dengan koordinat GPS di lapangan
-- **Analisis Real-time**: Klasifikasi instan dengan skor confidence
-- **Location Tracking**: Koordinat GPS untuk pemetaan kerusakan
+## 🏗️ Arsitektur & Port
 
-## 🏗️ Arsitektur
+```
+ HP (Expo Go) ──┐
+                ├──>  proxy.js  0.0.0.0:8000  ──>  Django  127.0.0.1:8001  ──>  PostgreSQL :5432
+ Browser ───────┘     (LAN, CORS)                  (API + model AI)            (atau SQLite)
+
+ Frontend statis  http://localhost:3000   (memanggil API di http://<host-halaman>:8000)
+ Metro / Expo     port 8081
+```
+
+| Service | Alamat | Keterangan |
+|---|---|---|
+| Django (`runserver`) | `127.0.0.1:8001` | Hanya lokal; jangan diakses langsung oleh client |
+| Proxy API (`backend/proxy.js`) | `0.0.0.0:8000` | **Satu-satunya alamat API untuk semua client** (frontend & mobile) |
+| Frontend | `http://localhost:3000` | `python3 -m http.server 3000` |
+| Expo dev server | `8081` | `npx expo start` |
+
+Port proxy bisa diubah lewat env `PROXY_PORT`, `DJANGO_PORT`, `DJANGO_HOST` (default 8000 → 127.0.0.1:8001).
 
 ```
 RoadPulse/
-├── backend/           # Django REST API + AI Model
-│   ├── api/          # REST endpoints
-│   ├── ai_model/     # MobileNetV2 integration
-│   ├── roadpulse/    # Django project settings
-│   └── media/        # Uploaded images
-├── frontend/         # Web Dashboard
-│   ├── index.html
-│   ├── css/style.css
-│   └── js/           # Vanilla JS + Chart.js
-└── mobile/           # React Native Expo App
-    ├── App.js
-    └── screens/      # Camera screen
+├── backend/
+│   ├── ai_model/       # model_loader.py, preprocessor.py, train.py, mobilenetv2_road_damage.pt
+│   ├── api/            # REST endpoints, serializers, model InspectionRecord
+│   ├── roadpulse/      # settings.py, urls.py
+│   ├── media/uploads/  # gambar hasil upload (data lokal, tidak di-commit)
+│   ├── proxy.js        # proxy API Node.js (8000 -> 8001)
+│   ├── requirements.txt
+│   └── venv311/        # virtualenv Python 3.11 (dipakai proyek)
+├── frontend/           # index.html, login.html, js/config.js (alamat API), js/app.js, js/dashboard.js
+├── mobile/             # App.js, config.js (alamat API), app.json, package.json
+└── dataset/            # Crack/, Normal/, Pothole/, Surface Erosion/ (untuk training)
 ```
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack (sesuai file proyek)
 
-**Backend:** Python 3.14, Django 6.1, DRF, Pillow, NumPy, Mock MobileNetV2
-**Frontend:** HTML5/CSS3/JavaScript ES6+, Chart.js 4.4
-**Mobile:** React Native 0.86, Expo 57, expo-camera, expo-location, Axios
+**Backend** (`backend/requirements.txt`): Python 3.11, Django 4.2.7, Django REST Framework 3.14.0, drf-spectacular 0.28.0, django-cors-headers 4.3.1, python-dotenv 1.0.1, psycopg2-binary 2.9.10, Pillow 10.1.0, NumPy 1.24.3, PyTorch 2.2.2, torchvision 0.17.2
+**Database**: PostgreSQL (default), opsional SQLite (`DB_ENGINE=sqlite`)
+**Proxy**: Node.js (modul bawaan `http`, tanpa dependency)
+**Frontend**: HTML/CSS/JavaScript, Chart.js 4.4.0, Leaflet 1.9.4, exifr 7.1.3 (via CDN)
+**Mobile** (`mobile/package.json`): Expo SDK 58 (`expo` 58.0.x), React Native 0.88.0, React 19.3.0, expo-camera, expo-location, expo-status-bar, react-native-safe-area-context
 
-## 📦 Instalasi
+## ✅ Prasyarat (macOS)
 
-### 1. Backend Setup
+- Python 3.11 (virtualenv `backend/venv311` sudah berisi PyTorch; folder `backend/venv` memakai Python 3.14 tanpa PyTorch, **jangan dipakai**)
+- PostgreSQL berjalan di `127.0.0.1:5432` (mis. PostgreSQL 18 installer EDB atau Postgres.app) — atau pakai SQLite
+- Node.js LTS (≥ 20) dan npm
+- HP dengan aplikasi **Expo Go** versi yang mendukung SDK 58, terhubung ke **Wi-Fi yang sama** dengan Mac
+
+## 📦 Instalasi (sekali saja)
+
+### 1. Backend
+
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Jika venv311 belum ada: python3.11 -m venv venv311
+source venv311/bin/activate
 pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
 ```
-Backend: **http://localhost:8000**
 
-### 2. Frontend Setup
+Konfigurasi dibaca dari `backend/.env` (lihat [Konfigurasi env](#-konfigurasi-env)). Pastikan kredensial PostgreSQL di sana cocok dengan server PostgreSQL lokal Anda, lalu buat database jika belum ada:
+
 ```bash
-cd frontend
-open index.html  # atau: python -m http.server 3000
+# contoh dengan psql dari PostgreSQL 18 (EDB): /Library/PostgreSQL/18/bin/psql
+psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE "<DB_NAME dari .env>";'
 ```
-Frontend: **http://localhost:3000**
 
-### 3. Mobile Setup
+Migrasi dan akun admin:
+
+```bash
+python manage.py migrate
+python manage.py createsuperuser   # untuk /admin/ dan login dashboard
+```
+
+> **Memakai SQLite saja** (tanpa PostgreSQL): tambahkan `DB_ENGINE=sqlite` di depan perintah atau di `backend/.env`, mis. `DB_ENGINE=sqlite python manage.py migrate`. File default: `backend/db.sqlite3` (bisa diganti dengan `SQLITE_PATH`). Backup dulu file database sebelum migrate.
+
+### 2. Mobile
+
 ```bash
 cd mobile
 npm install
-npx expo install expo-camera expo-location axios
+cp .env.example .env.local
+```
+
+Isi `mobile/.env.local` dengan **IP LAN Mac** (bukan `localhost`):
+
+```bash
+ipconfig getifaddr en0          # Wi-Fi; contoh hasil: 192.168.1.10
+# mobile/.env.local
+EXPO_PUBLIC_API_URL=http://192.168.1.10:8000
+```
+
+Saat dijalankan lewat Expo Go, aplikasi **otomatis** memakai IP Mac yang menjalankan `npx expo start` (port 8000), jadi tetap jalan walau pindah Wi-Fi/hotspot. `EXPO_PUBLIC_API_URL` dipakai jika IP itu tidak bisa dideteksi (mis. `--tunnel`) atau tidak bisa dijangkau. Nilai `EXPO_PUBLIC_*` dibaca Expo saat bundling: setelah mengubahnya, jalankan `npx expo start --clear`. Alamat juga bisa diganti langsung di aplikasi lewat tombol status server (pojok kanan atas).
+
+## 🚀 Menjalankan (satu perintah)
+
+```bash
+./start.sh              # Django :8001 + proxy :8000 + web :3000 + Expo (QR)
+./start.sh --no-mobile  # tanpa Expo
+```
+
+`start.sh` membebaskan port lama, memakai PostgreSQL (pakai SQLite dengan `DB_ENGINE=sqlite ./start.sh`), menulis IP LAN ke `mobile/.env.local`, dan menyimpan log di `.logs/`. Ctrl+C mematikan semuanya.
+
+### Manual (4 terminal terpisah)
+
+**Terminal 1 — Django API (port 8001)**
+```bash
+cd backend
+source venv311/bin/activate
+python manage.py runserver 127.0.0.1:8001
+```
+
+**Terminal 2 — Proxy API (port 8000, bisa diakses dari LAN)**
+```bash
+cd backend
+node proxy.js
+# RoadPulse API Proxy listening on 0.0.0.0:8000 -> 127.0.0.1:8001
+```
+
+**Terminal 3 — Web dashboard (port 3000)**
+```bash
+cd frontend
+python3 -m http.server 3000
+```
+
+**Terminal 4 — Mobile (Expo)**
+```bash
+cd mobile
 npx expo start
 ```
-Scan QR code dengan **Expo Go** app (iOS/Android).
+Scan QR code dengan Expo Go (Android) atau aplikasi Kamera (iOS).
 
-**Penting:** Update `API_BASE_URL` di `mobile/screens/CameraScreen.js` dengan IP lokal Anda (bukan localhost).
+### URL lokal
+
+| Halaman | URL |
+|---|---|
+| Web dashboard | http://localhost:3000 |
+| Login dashboard (opsional, token API) | http://localhost:3000/login.html |
+| API root | http://localhost:8000/api/v1/ |
+| Swagger UI | http://localhost:8000/api/docs/ |
+| ReDoc | http://localhost:8000/api/redoc/ |
+| OpenAPI schema | http://localhost:8000/api/schema/ |
+| Django admin | http://localhost:8000/admin/ |
+| Dari HP / perangkat lain | `http://<IP-LAN-Mac>:8000/api/v1/` dan `http://<IP-LAN-Mac>:3000` |
+
+Frontend otomatis memanggil API di `http://<hostname halaman>:8000`, jadi dashboard yang dibuka dari `http://<IP-LAN-Mac>:3000` juga berfungsi. Override manual (di console browser): `localStorage.setItem('rp_api_origin', 'http://192.168.1.10:8000')`.
+
+## ⚙️ Konfigurasi env
+
+`backend/.env` (dibaca oleh `settings.py` via python-dotenv). Variabel yang dikenali:
+
+| Variabel | Default | Fungsi |
+|---|---|---|
+| `SECRET_KEY` | kunci dev | Kunci Django |
+| `DEBUG` | `True` | Mode debug (`True`/`False`) |
+| `ALLOWED_HOSTS` | `*` | Dipisah koma |
+| `DB_ENGINE` | `postgresql` | `postgresql` atau `sqlite` |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | `roadpulse_db`, `postgres`, kosong, `127.0.0.1`, `5432` | Koneksi PostgreSQL |
+| `SQLITE_PATH` | `backend/db.sqlite3` | Lokasi file SQLite bila `DB_ENGINE=sqlite` |
+
+`mobile/.env.local` / `mobile/.env`: `EXPO_PUBLIC_API_URL` (alamat proxy, mis. `http://192.168.1.10:8000`). Tanpa variabel ini aplikasi memakai `http://10.0.2.2:8000` (emulator Android) atau `http://localhost:8000` (simulator iOS) yang **tidak** berfungsi di HP fisik.
+
+File `.env` berisi konfigurasi/rahasia lokal dan tidak boleh di-commit (sudah ada di `.gitignore`).
 
 ## 📡 API Endpoints
+
+| Method | Endpoint | Keterangan |
+|---|---|---|
+| GET | `/api/v1/` | Daftar endpoint |
+| POST | `/api/v1/classify/` | Upload gambar (multipart) → klasifikasi |
+| GET | `/api/v1/dashboard/stats/` | Total, distribusi kelas, 5 inspeksi terbaru |
+| GET | `/api/v1/dashboard/history/?page=N` | Riwayat, 10 per halaman |
+| GET | `/api/v1/dashboard/map/` | Titik inspeksi ber-GPS (maks. 1000) |
+| POST | `/api/v1/auth/login/` | `{username, password}` → `{token, username}` |
+| POST | `/api/v1/auth/register/` | `{username, password, password_confirm}` → `{token, username}` (201) |
 
 ### POST `/api/v1/classify/`
 ```bash
 curl -X POST http://localhost:8000/api/v1/classify/ \
   -F "image=@road.jpg" \
-  -F "latitude=-6.2088" \
-  -F "longitude=106.8456"
+  -F "latitude=-5.4292" \
+  -F "longitude=105.2610" \
+  -F "location_name=Tanjung Karang, Bandar Lampung" \
+  -F "captured_at=2026-10-30T08:00:00+07:00"
 ```
+Hanya JPEG/PNG, maksimal 10 MB. `latitude`, `longitude`, `location_name`, `captured_at` opsional.
 
-**Response:**
+**Response 201:**
 ```json
 {
   "id": 1,
   "class_label": "Pothole",
   "confidence_score": 0.89,
   "image_url": "/media/uploads/road.jpg",
-  "latitude": -6.2088,
-  "longitude": 106.8456,
-  "created_at": "2026-09-25T03:15:00Z"
+  "latitude": -5.4292,
+  "longitude": 105.261,
+  "location_name": "Tanjung Karang, Bandar Lampung",
+  "captured_at": "2026-10-30T08:00:00+07:00",
+  "created_at": "2026-10-30T08:00:02+07:00"
 }
 ```
+Error: `400` (data/gambar tidak valid), `503` (model tidak tersedia), `500` (prediksi gagal). Pada `503`/`500` record inspeksi tidak disimpan.
 
 ### GET `/api/v1/dashboard/stats/`
 ```json
 {
   "total_inspections": 127,
-  "class_distribution": {
-    "Crack": 35,
-    "Pothole": 42,
-    "Surface Erosion": 28,
-    "Normal": 22
-  },
-  "recent_inspections": [...]
+  "class_distribution": { "Crack": 35, "Pothole": 42, "Surface Erosion": 28, "Normal": 22 },
+  "recent_inspections": [ ... ]
 }
 ```
 
 ## 🤖 AI Model
 
-Saat ini menggunakan **mock MobileNetV2** yang menghasilkan prediksi random untuk demonstrasi.
+- **Arsitektur**: MobileNetV2 (torchvision) dengan classifier `Dropout(0.3) → Linear(1280, 4)`, inferensi dengan PyTorch di MPS (Apple Silicon) / CUDA / CPU.
+- **File model**: `backend/ai_model/mobilenetv2_road_damage.pt` — checkpoint PyTorch (dict berisi `model_state_dict`, `classes`, `val_acc`). Bukan file Keras/`.h5`.
+- **Urutan kelas**: diambil dari `classes` di checkpoint (urutan alfabetis ImageFolder: `Crack, Normal, Pothole, Surface Erosion`). Checkpoint saat ini mencatat `val_acc` ≈ 0.85.
+- **Preprocessing** (`preprocessor.py`): rotasi EXIF diterapkan, resize 224×224, normalisasi mean/std ImageNet.
+- **Heuristik tambahan**: bila model memprediksi `Normal`, `_is_pothole_like()` memeriksa area gelap memanjang (genangan/lubang basah); jika cocok label diubah ke `Pothole` dengan confidence minimal 0.65.
+- **Bila model tidak tersedia** (file `.pt` tidak ada, PyTorch/torchvision belum terpasang, atau checkpoint tidak valid): endpoint classify mengembalikan **HTTP 503** dengan pesan error. Tidak ada prediksi mock/random.
 
-**Untuk model terlatih:**
-1. Train MobileNetV2 pada dataset kerusakan jalan
-2. Simpan weights ke `backend/ai_model/mobilenetv2_road_damage.h5`
-3. Update `backend/ai_model/model_loader.py` dengan TensorFlow/Keras
+**Melatih ulang:**
+```bash
+cd backend
+source venv311/bin/activate
+python ai_model/train.py     # membaca ../dataset/<kelas>/*.jpg, menyimpan mobilenetv2_road_damage.pt
+```
+Training: 8 epoch classifier head + 3 epoch fine-tuning, split 80/20 (seed 42). Checkpoint terbaik (val accuracy) disimpan otomatis. Restart Django setelah training agar model baru dimuat.
 
-## 🚦 Production Deployment
+## 🧪 Test
 
-**Backend:** Set DEBUG=False, gunakan PostgreSQL, nginx, Gunicorn, HTTPS
-**Frontend:** Deploy ke Vercel/Netlify dengan CDN
-**Mobile:** Build APK/IPA via Expo EAS, publish ke Play Store/App Store
+```bash
+cd backend
+DB_ENGINE=sqlite venv311/bin/python manage.py test api      # 18 test: classify, validasi, dashboard, login, daftar, batas percobaan
+venv311/bin/python ai_model/train.py --eval ai_model/mobilenetv2_road_damage.pt   # akurasi model per kelas
+```
+
+Login dibatasi 10 percobaan/menit dan pendaftaran 5/jam per IP (ubah lewat `THROTTLE_LOGIN` / `THROTTLE_REGISTER` di `.env`).
 
 ## 🐛 Troubleshooting
 
-- **Backend error:** Pastikan Python 3.10+, venv aktif, run migrations
-- **Frontend can't connect:** Cek backend running, CORS enabled
-- **Mobile error:** Update API_BASE_URL dengan IP lokal, pastikan WiFi sama
+- **`password authentication failed for user "postgres"`**: kredensial `DB_*` di `backend/.env` tidak cocok dengan PostgreSQL lokal. Sesuaikan `.env` atau pakai `DB_ENGINE=sqlite`.
+- **`ModuleNotFoundError: drf_spectacular` / `dotenv` / `psycopg2` / `torch`**: venv salah atau belum install. Aktifkan `venv311` lalu `pip install -r requirements.txt`.
+- **Proxy menampilkan `Backend server unavailable` (502)**: Django belum berjalan di `127.0.0.1:8001`.
+- **`EADDRINUSE` / port terpakai**: cek dengan `lsof -nP -iTCP:8000 -sTCP:LISTEN` (ganti 8001/3000/8081), hentikan proses lama.
+- **Mobile "Server belum terhubung"**: pastikan `EXPO_PUBLIC_API_URL` memakai IP LAN Mac + port 8000, HP satu Wi-Fi dengan Mac, Django & proxy berjalan, lalu restart `npx expo start`. Uji dari browser HP: `http://<IP-LAN-Mac>:8000/api/v1/`. Izinkan koneksi masuk untuk `node` bila macOS Firewall bertanya. Jaringan kampus/hotspot dengan *client isolation* bisa memblokir; gunakan hotspot HP atau `npx expo start --tunnel` (tunnel hanya untuk Metro, API tetap butuh IP yang terjangkau).
+- **IP Mac berubah** (ganti Wi-Fi/hotspot): perbarui `mobile/.env.local` lalu restart Expo, atau ubah alamat dari aplikasi.
+- **Klasifikasi 503**: file `backend/ai_model/mobilenetv2_road_damage.pt` tidak ada atau PyTorch tidak terpasang di venv aktif.
+- **Expo memperingatkan versi paket**: jalankan `npx expo install --check` untuk melihat versi yang direkomendasikan SDK 58.
+
+## 🚦 Production Deployment
+
+**Backend:** `DEBUG=False`, `SECRET_KEY` & `ALLOWED_HOSTS` dari env, PostgreSQL, Gunicorn + nginx (nginx menggantikan proxy.js dan melayani `/media/`), HTTPS
+**Frontend:** Hosting statis (Vercel/Netlify), set `rp_api_origin` atau ubah `frontend/js/config.js` ke domain API
+**Mobile:** Build via Expo EAS dengan `EXPO_PUBLIC_API_URL` mengarah ke API HTTPS
 
 ## 📝 License
 
