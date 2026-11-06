@@ -12,6 +12,7 @@ RoadPulse adalah sistem AI untuk mendeteksi dan mengklasifikasikan kerusakan jal
 - **Web Dashboard**: Upload gambar (GPS & waktu dibaca dari EXIF), statistik Chart.js, riwayat, dan peta Leaflet
 - **Mobile App**: Ambil foto dengan kamera + koordinat GPS di lapangan, ringkasan dan riwayat inspeksi
 - **Dokumentasi API**: Swagger UI / ReDoc / OpenAPI (drf-spectacular)
+- **User Manual**: panduan lengkap pengguna & admin di [`USERMANUAL/USERMANUAL_RoadPulse.pdf`](USERMANUAL/USERMANUAL_RoadPulse.pdf) (versi Word: `.docx`)
 
 ## 🏗️ Arsitektur & Port
 
@@ -42,10 +43,14 @@ RoadPulse/
 │   ├── media/uploads/  # gambar hasil upload (data lokal, tidak di-commit)
 │   ├── proxy.js        # proxy API Node.js (8000 -> 8001)
 │   ├── requirements.txt
+│   ├── .env.example    # contoh konfigurasi; salin ke .env (tidak di-commit)
 │   └── venv311/        # virtualenv Python 3.11 (dipakai proyek)
 ├── frontend/           # index.html, login.html, js/config.js (alamat API), js/app.js, js/dashboard.js
-├── mobile/             # App.js, config.js (alamat API), app.json, package.json
-└── dataset/            # Crack/, Normal/, Pothole/, Surface Erosion/ (untuk training)
+├── mobile/             # App.js, config.js, screens/, components/, theme/, services/
+├── USERMANUAL/         # User Manual (.docx & .pdf) + source/ untuk membangun ulang
+├── docs/               # dokumen desain & audit aplikasi mobile
+├── dataset/            # Crack/, Normal/, Pothole/, Surface Erosion/ (untuk training)
+└── start.sh            # menjalankan semua layanan dengan satu perintah
 ```
 
 ## 🛠️ Tech Stack (sesuai file proyek)
@@ -74,11 +79,16 @@ source venv311/bin/activate
 pip install -r requirements.txt
 ```
 
-Konfigurasi dibaca dari `backend/.env` (lihat [Konfigurasi env](#-konfigurasi-env)). Pastikan kredensial PostgreSQL di sana cocok dengan server PostgreSQL lokal Anda, lalu buat database jika belum ada:
+Buat file konfigurasi dari contoh, lalu sesuaikan `DB_PASSWORD` dengan kata sandi PostgreSQL Anda (proyek ini memakai `roadpulse`):
 
 ```bash
-# contoh dengan psql dari PostgreSQL 18 (EDB): /Library/PostgreSQL/18/bin/psql
-psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE "<DB_NAME dari .env>";'
+cp .env.example .env
+```
+
+Buat database (PostgreSQL 18 installer EDB; masukkan password user `postgres` saat diminta):
+
+```bash
+/Library/PostgreSQL/18/bin/createdb -U postgres -h localhost Roadpulse_db
 ```
 
 Migrasi dan akun admin:
@@ -88,7 +98,22 @@ python manage.py migrate
 python manage.py createsuperuser   # untuk /admin/ dan login dashboard
 ```
 
-> **Memakai SQLite saja** (tanpa PostgreSQL): tambahkan `DB_ENGINE=sqlite` di depan perintah atau di `backend/.env`, mis. `DB_ENGINE=sqlite python manage.py migrate`. File default: `backend/db.sqlite3` (bisa diganti dengan `SQLITE_PATH`). Backup dulu file database sebelum migrate.
+> **Database tidak ikut di repo.** Data (akun & inspeksi) hanya ada di database lokal masing-masing, jadi setiap anggota tim menjalankan `migrate` dan `createsuperuser` sendiri. Model AI `backend/ai_model/mobilenetv2_road_damage.pt` juga tidak di-commit (`*.pt` di `.gitignore`): minta file-nya ke tim atau latih ulang (lihat [AI Model](#-ai-model)), tanpa file ini endpoint classify mengembalikan 503.
+
+> **Memakai SQLite saja** (tanpa PostgreSQL): tambahkan `DB_ENGINE=sqlite` di depan perintah atau di `backend/.env`, mis. `DB_ENGINE=sqlite python manage.py migrate`. File default: `backend/db.sqlite3` (bisa diganti dengan `SQLITE_PATH`).
+
+### Membuka database PostgreSQL
+
+| Isian | Nilai |
+|---|---|
+| Host / Port | `localhost` / `5432` |
+| Username / Password | `postgres` / `roadpulse` |
+| Database | `Roadpulse_db` |
+
+- **pgAdmin 4**: Servers → PostgreSQL 18 (password `roadpulse`) → Databases → Roadpulse_db → Schemas → public → Tables → klik kanan tabel → View/Edit Data → All Rows.
+- **Terminal**: `/Library/PostgreSQL/18/bin/psql -U postgres -h localhost -d Roadpulse_db`, lalu `\dt` (daftar tabel), `select * from api_inspectionrecord limit 5;`, `\q` (keluar).
+
+Password `roadpulse` hanya untuk pengembangan lokal; gunakan password kuat di server.
 
 ### 2. Mobile
 
@@ -169,14 +194,14 @@ Frontend otomatis memanggil API di `http://<hostname halaman>:8000`, jadi dashbo
 |---|---|---|
 | `SECRET_KEY` | kunci dev | Kunci Django |
 | `DEBUG` | `True` | Mode debug (`True`/`False`) |
-| `ALLOWED_HOSTS` | `*` | Dipisah koma |
+| `ALLOWED_HOSTS` | `*` | Dipisah koma. Saat `DEBUG=True`, IP LAN komputer otomatis diizinkan dan dibaca ulang tiap request (matikan dengan `ALLOW_LAN_HOSTS=False`) |
 | `DB_ENGINE` | `postgresql` | `postgresql` atau `sqlite` |
-| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | `roadpulse_db`, `postgres`, kosong, `127.0.0.1`, `5432` | Koneksi PostgreSQL |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | `roadpulse_db`, `postgres`, kosong, `127.0.0.1`, `5432` | Koneksi PostgreSQL (nilai proyek ada di `backend/.env.example`) |
 | `SQLITE_PATH` | `backend/db.sqlite3` | Lokasi file SQLite bila `DB_ENGINE=sqlite` |
 
 `mobile/.env.local` / `mobile/.env`: `EXPO_PUBLIC_API_URL` (alamat proxy, mis. `http://192.168.1.10:8000`). Tanpa variabel ini aplikasi memakai `http://10.0.2.2:8000` (emulator Android) atau `http://localhost:8000` (simulator iOS) yang **tidak** berfungsi di HP fisik.
 
-File `.env` berisi konfigurasi/rahasia lokal dan tidak boleh di-commit (sudah ada di `.gitignore`).
+File `.env` berisi konfigurasi/rahasia lokal dan tidak boleh di-commit (sudah ada di `.gitignore`). Salin dari `backend/.env.example` untuk memulai.
 
 ## 📡 API Endpoints
 
@@ -247,7 +272,7 @@ Training: 8 epoch classifier head + 3 epoch fine-tuning, split 80/20 (seed 42). 
 
 ```bash
 cd backend
-DB_ENGINE=sqlite venv311/bin/python manage.py test api      # 18 test: classify, validasi, dashboard, login, daftar, batas percobaan
+venv311/bin/python manage.py test api      # 18 test: classify, validasi, dashboard, login, daftar, batas percobaan
 venv311/bin/python ai_model/train.py --eval ai_model/mobilenetv2_road_damage.pt   # akurasi model per kelas
 ```
 
@@ -255,12 +280,13 @@ Login dibatasi 10 percobaan/menit dan pendaftaran 5/jam per IP (ubah lewat `THRO
 
 ## 🐛 Troubleshooting
 
-- **`password authentication failed for user "postgres"`**: kredensial `DB_*` di `backend/.env` tidak cocok dengan PostgreSQL lokal. Sesuaikan `.env` atau pakai `DB_ENGINE=sqlite`.
+- **`password authentication failed for user "postgres"`**: `DB_PASSWORD` di `backend/.env` tidak sama dengan password PostgreSQL lokal. Sesuaikan `.env` (cek dengan perintah psql di atas) atau jalankan sementara dengan `DB_ENGINE=sqlite ./start.sh`.
+- **`DisallowedHost: Invalid HTTP_HOST header`**: host tidak ada di `ALLOWED_HOSTS`. Dengan `DEBUG=True` IP LAN komputer otomatis diizinkan; untuk host lain tambahkan ke `ALLOWED_HOSTS` di `.env`.
 - **`ModuleNotFoundError: drf_spectacular` / `dotenv` / `psycopg2` / `torch`**: venv salah atau belum install. Aktifkan `venv311` lalu `pip install -r requirements.txt`.
 - **Proxy menampilkan `Backend server unavailable` (502)**: Django belum berjalan di `127.0.0.1:8001`.
 - **`EADDRINUSE` / port terpakai**: cek dengan `lsof -nP -iTCP:8000 -sTCP:LISTEN` (ganti 8001/3000/8081), hentikan proses lama.
 - **Mobile "Server belum terhubung"**: pastikan `EXPO_PUBLIC_API_URL` memakai IP LAN Mac + port 8000, HP satu Wi-Fi dengan Mac, Django & proxy berjalan, lalu restart `npx expo start`. Uji dari browser HP: `http://<IP-LAN-Mac>:8000/api/v1/`. Izinkan koneksi masuk untuk `node` bila macOS Firewall bertanya. Jaringan kampus/hotspot dengan *client isolation* bisa memblokir; gunakan hotspot HP atau `npx expo start --tunnel` (tunnel hanya untuk Metro, API tetap butuh IP yang terjangkau).
-- **IP Mac berubah** (ganti Wi-Fi/hotspot): perbarui `mobile/.env.local` lalu restart Expo, atau ubah alamat dari aplikasi.
+- **IP Mac berubah** (ganti Wi-Fi/hotspot): backend otomatis menerima IP baru tanpa restart, dan Expo Go memakai IP komputer yang menjalankan Expo. Bila aplikasi masih memakai alamat lama, tekan **r** di terminal Expo atau ubah alamat dari aplikasi; `./start.sh` berikutnya memperbarui `mobile/.env.local`.
 - **Klasifikasi 503**: file `backend/ai_model/mobilenetv2_road_damage.pt` tidak ada atau PyTorch tidak terpasang di venv aktif.
 - **Expo memperingatkan versi paket**: jalankan `npx expo install --check` untuk melihat versi yang direkomendasikan SDK 58.
 
