@@ -7,18 +7,36 @@ function withTimeout(promise, ms, fallback) {
   return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(fallback), ms))]);
 }
 
+// ── Token login ──
+// Data inspeksi wajib login: token sesi dikirim sebagai "Authorization: Token <key>".
+let authToken = null;
+export function setAuthToken(token) {
+  authToken = token || null;
+}
+function applyAuth(xhr) {
+  if (authToken) xhr.setRequestHeader('Authorization', `Token ${authToken}`);
+}
+// Error dengan status HTTP agar pemanggil bisa membedakan 401 (sesi habis) dari gangguan jaringan.
+function httpError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+export const isUnauthorized = (err) => err?.status === 401;
+
 // ── Helper HTTP Berbasis XMLHttpRequest (Bypass Bug expo/fetch di iOS) ──
 export function requestJson(url, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url);
+    applyAuth(xhr);
     xhr.timeout = timeoutMs;
     xhr.onload = () => {
       try {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve(JSON.parse(xhr.responseText));
         } else {
-          reject(new Error(`HTTP ${xhr.status}`));
+          reject(httpError(xhr.status === 401 ? 'Sesi berakhir. Silakan masuk lagi.' : `HTTP ${xhr.status}`, xhr.status));
         }
       } catch (err) {
         reject(err);
@@ -34,6 +52,7 @@ export function uploadInspectionXHR(url, photoUri, lat, lng, locationName, captu
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
+    applyAuth(xhr);
     xhr.timeout = 35000;
 
     xhr.onload = () => {
@@ -41,13 +60,15 @@ export function uploadInspectionXHR(url, photoUri, lat, lng, locationName, captu
       try {
         json = JSON.parse(xhr.responseText);
       } catch (_) {
-        reject(new Error(`Respon tidak valid (${xhr.status})`));
+        reject(httpError(`Respon tidak valid (${xhr.status})`, xhr.status));
         return;
       }
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(json);
+      } else if (xhr.status === 401) {
+        reject(httpError('Sesi berakhir. Silakan masuk lagi.', 401));
       } else {
-        reject(new Error(json?.error || `Server error (${xhr.status})`));
+        reject(httpError(json?.error || json?.detail || `Server error (${xhr.status})`, xhr.status));
       }
     };
 
@@ -116,7 +137,7 @@ export function loginRequest(host, username, password, timeoutMs = 10000) {
       else reject(new Error(json?.error || `Server error (${xhr.status})`));
     };
     xhr.ontimeout = () => reject(new Error('Server tidak merespons. Periksa koneksi lalu coba lagi.'));
-    xhr.onerror = () => reject(new Error('Gagal terhubung ke server. Pastikan HP dan komputer satu Wi-Fi.'));
+    xhr.onerror = () => reject(new Error('Gagal terhubung ke server. Periksa koneksi internet atau alamat server di Pengaturan.'));
     xhr.send(JSON.stringify({ username, password }));
   });
 }
@@ -140,7 +161,19 @@ export function registerRequest(host, username, password, passwordConfirm, timeo
       reject(err);
     };
     xhr.ontimeout = () => reject(new Error('Server tidak merespons. Periksa koneksi lalu coba lagi.'));
-    xhr.onerror = () => reject(new Error('Gagal terhubung ke server. Pastikan HP dan komputer satu Wi-Fi.'));
+    xhr.onerror = () => reject(new Error('Gagal terhubung ke server. Periksa koneksi internet atau alamat server di Pengaturan.'));
     xhr.send(JSON.stringify({ username, password, password_confirm: passwordConfirm }));
+  });
+}
+
+// Mencabut token di server saat keluar. Gagal (mis. offline) tidak menghalangi logout lokal.
+export function logoutRequest(host, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${host}/api/v1/auth/logout/`);
+    applyAuth(xhr);
+    xhr.timeout = timeoutMs;
+    xhr.onloadend = () => resolve();
+    xhr.send();
   });
 }

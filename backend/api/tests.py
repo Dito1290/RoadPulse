@@ -10,6 +10,7 @@ from django.db import DatabaseError
 from django.test import override_settings
 from PIL import Image
 from rest_framework.authtoken.models import Token
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.test import APITestCase
 
 from ai_model.model_loader import ModelUnavailableError
@@ -35,10 +36,20 @@ class BaseTest(APITestCase):
         super().tearDownClass()
         shutil.rmtree(MEDIA, ignore_errors=True)
 
+    def login_as(self, username='petugas'):
+        user = User.objects.create_user(username, password='JalanRusak#2026')
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+        return user, token
+
 
 @override_settings(MEDIA_ROOT=MEDIA)
 class ClassifyTests(BaseTest):
     url = '/api/v1/classify/'
+
+    def setUp(self):
+        super().setUp()
+        self.login_as()
 
     @mock.patch('api.views.predict_image', return_value=FAKE_PREDICTION)
     def test_classify_saves_record(self, _pred):
@@ -93,6 +104,7 @@ class ClassifyTests(BaseTest):
 class DashboardTests(BaseTest):
     def setUp(self):
         super().setUp()
+        self.login_as()
         for i, label in enumerate(['Crack', 'Pothole', 'Normal'] * 4):
             InspectionRecord.objects.create(image=f'uploads/t{i}.jpg', class_label=label, confidence_score=0.9,
                                             latitude=-5.4 if i % 2 else None, longitude=105.2 if i % 2 else None)
@@ -187,3 +199,45 @@ class ThrottleTests(BaseTest):
                                  HTTP_X_FORWARDED_FOR='192.168.1.50')
         self.assertEqual(blocked.status_code, 429)
         self.assertEqual(other.status_code, 401)
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class AccessControlTests(BaseTest):
+    """Data inspeksi hanya untuk pengguna yang sudah login."""
+    protected = [
+        ('get', '/api/v1/dashboard/stats/'),
+        ('get', '/api/v1/dashboard/history/'),
+        ('get', '/api/v1/dashboard/map/'),
+        ('post', '/api/v1/classify/'),
+        ('post', '/api/v1/auth/logout/'),
+    ]
+
+    def test_protected_endpoints_require_token(self):
+        for method, url in self.protected:
+            res = getattr(self.client, method)(url)
+            self.assertEqual(res.status_code, 401, f'{method.upper()} {url}')
+            self.assertEqual(res['Content-Type'], 'application/json')
+
+    def test_invalid_token_rejected(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Token tidak-valid')
+        self.assertEqual(self.client.get('/api/v1/dashboard/stats/').status_code, 401)
+
+    def test_public_endpoints_stay_open(self):
+        for url in ['/api/v1/', '/healthz/', '/privacy/']:
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+        self.assertEqual(self.client.get('/healthz/').json()['status'], 'ok')
+
+    def test_logout_revokes_token(self):
+        _, token = self.login_as()
+        self.assertEqual(self.client.get('/api/v1/dashboard/stats/').status_code, 200)
+        self.assertEqual(self.client.post('/api/v1/auth/logout/').status_code, 204)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+        self.assertEqual(self.client.get('/api/v1/dashboard/stats/').status_code, 401)
+
+    @mock.patch('api.views.predict_image', return_value=FAKE_PREDICTION)
+    def test_classify_is_rate_limited_per_user(self, _pred):
+        with mock.patch.object(ScopedRateThrottle, 'THROTTLE_RATES', {'classify': '2/hour'}):
+            self.login_as()
+            codes = [self.client.post('/api/v1/classify/', {'image': image_file()}, format='multipart').status_code
+                     for _ in range(3)]
+        self.assertEqual(codes, [201, 201, 429])

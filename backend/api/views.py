@@ -10,7 +10,7 @@ from ai_model.model_loader import ModelUnavailableError, predict_image
 from ai_model.preprocessor import validate_image
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from django.db import DatabaseError
 import logging
@@ -39,6 +39,7 @@ def api_v1_root(_request):
             'dashboard_map': '/api/v1/dashboard/map/',
             'login': '/api/v1/auth/login/',
             'register': '/api/v1/auth/register/',
+            'logout': '/api/v1/auth/logout/',
             'openapi_schema': '/api/schema/',
             'swagger_ui': '/api/docs/',
             'redoc': '/api/redoc/',
@@ -107,7 +108,9 @@ class ClassifyView(APIView):
     API endpoint for image classification
     POST /api/v1/classify/
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'classify'
     
     @extend_schema(
         operation_id='classifyImage',
@@ -202,7 +205,7 @@ class DashboardStatsView(APIView):
     API endpoint for dashboard statistics
     GET /api/v1/dashboard/stats/
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         operation_id='getDashboardStats',
@@ -238,9 +241,19 @@ class DashboardStatsView(APIView):
         })
 
 
+class LogoutView(APIView):
+    """Menghapus token di server sehingga token lama tidak bisa dipakai lagi."""
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(operation_id='logout', summary='Keluar dan mencabut token API', request=None, responses={204: None})
+    def post(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class InspectionHistoryView(APIView):
     """Return a page of saved inspections for the dashboard history table."""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         operation_id='getInspectionHistory',
@@ -267,7 +280,7 @@ class InspectionHistoryView(APIView):
 
 class InspectionMapView(APIView):
     """Return recent geotagged inspections for the dashboard map."""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
         operation_id='getInspectionMap',

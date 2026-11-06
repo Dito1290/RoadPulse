@@ -9,9 +9,9 @@ async function loadDashboard(page = historyPage) {
     const apiStatus = document.getElementById('apiStatus');
     try {
         const [statsResponse, historyResponse, mapResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/dashboard/stats/`),
-            fetch(`${API_BASE_URL}/dashboard/history/?page=${page}`),
-            fetch(`${API_BASE_URL}/dashboard/map/`)
+            authFetch(`${API_BASE_URL}/dashboard/stats/`),
+            authFetch(`${API_BASE_URL}/dashboard/history/?page=${page}`),
+            authFetch(`${API_BASE_URL}/dashboard/map/`)
         ]);
 
         if (!statsResponse.ok || !historyResponse.ok) {
@@ -37,7 +37,7 @@ async function loadDashboard(page = historyPage) {
         apiStatus.classList.remove('connected');
         apiStatus.innerHTML = '<span class="dot"></span> API tidak terhubung';
         document.getElementById('historySummary').textContent =
-            'Riwayat tidak dapat dimuat. Jalankan backend Django di port 8000.';
+            'Riwayat tidak dapat dimuat. Periksa koneksi ke server lalu muat ulang halaman.';
         document.getElementById('historyTableBody').innerHTML =
             '<tr><td colspan="5">Data belum tersedia.</td></tr>';
     }
@@ -221,13 +221,13 @@ async function downloadReport() {
     const button = document.getElementById('downloadReportBtn');
     button.disabled = true;
     try {
-        const firstResponse = await fetch(`${API_BASE_URL}/dashboard/history/?page=1`);
+        const firstResponse = await authFetch(`${API_BASE_URL}/dashboard/history/?page=1`);
         if (!firstResponse.ok) throw new Error('Tidak dapat mengambil riwayat.');
         const firstPage = await firstResponse.json();
         const records = [...firstPage.results];
 
         for (let page = 2; page <= firstPage.total_pages; page += 1) {
-            const response = await fetch(`${API_BASE_URL}/dashboard/history/?page=${page}`);
+            const response = await authFetch(`${API_BASE_URL}/dashboard/history/?page=${page}`);
             if (!response.ok) throw new Error('Tidak dapat mengambil seluruh riwayat.');
             const data = await response.json();
             records.push(...data.results);

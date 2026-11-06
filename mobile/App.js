@@ -6,7 +6,9 @@ import * as Location from 'expo-location';
 import { StatusBar } from 'expo-status-bar';
 import { API_CANDIDATES, DEFAULT_API_ORIGIN, IS_ENV_CONFIGURED, normalizeOrigin } from './config';
 import { ThemeProvider, useStyles, useTheme } from './theme/ThemeContext';
-import { DEFAULT_LOCATION_NAME, requestJson, resolveLocationName, uploadInspectionXHR } from './services/api';
+import {
+  DEFAULT_LOCATION_NAME, isUnauthorized, logoutRequest, requestJson, resolveLocationName, setAuthToken, uploadInspectionXHR,
+} from './services/api';
 import { IconButton } from './components/ui';
 import { InspectionDetailSheet } from './components/inspection';
 import { SigerCrown, TapisLine } from './components/lampung';
@@ -78,6 +80,7 @@ function RoadPulseApp() {
   // Sesi login (token DRF disimpan di perangkat)
   const [session, setSession] = useState(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const loggedIn = !!session?.token;
 
   // Navigation & Screen States
   const [activeTab, setActiveTab] = useState('detect'); // 'detect' | 'stats' | 'history'
@@ -125,9 +128,20 @@ function RoadPulseApp() {
     setHistoryMeta({ page: data.page || 1, totalPages: data.total_pages || 1, totalRecords: data.total_records ?? 0 });
   };
 
+  // Token kedaluwarsa/dicabut (401): kembali ke layar login.
+  const expireSession = useCallback(() => {
+    setAuthToken(null);
+    clearSession();
+    setSession(null);
+  }, []);
+
   // Fetch Stats & History dari Backend Django
-  const fetchDashboardData = useCallback(async (host) => {
+  const fetchDashboardData = useCallback(async (host, loggedIn) => {
     try {
+      // Root API publik: menentukan status server, termasuk di layar login.
+      await requestJson(`${host}/api/v1/`, 6000);
+      setApiConnected(true);
+      if (!loggedIn) return true;
       const [statsData, historyData] = await Promise.all([
         requestJson(`${host}/api/v1/dashboard/stats/`, 6000),
         requestJson(`${host}/api/v1/dashboard/history/?page=1`, 6000),
@@ -146,11 +160,15 @@ function RoadPulseApp() {
         .catch((error) => setMapError(error?.message || String(error)));
       return true;
     } catch (error) {
+      if (isUnauthorized(error)) {
+        expireSession();
+        return true; // server terjangkau, hanya sesi yang habis
+      }
       console.log(`Backend connection error (${host}):`, error?.message || error);
       setApiConnected(false);
       return false;
     }
-  }, []);
+  }, [expireSession]);
 
   const loadMoreHistory = async () => {
     if (loadingMore || historyMeta.page >= historyMeta.totalPages) return;
@@ -160,6 +178,10 @@ function RoadPulseApp() {
       const data = await requestJson(`${backendHost}/api/v1/dashboard/history/?page=${historyMeta.page + 1}`, 6000);
       applyHistoryPage(data, true);
     } catch (error) {
+      if (isUnauthorized(error)) {
+        expireSession();
+        return;
+      }
       setLoadMoreError(`Gagal memuat halaman berikutnya: ${error?.message || error}`);
     } finally {
       setLoadingMore(false);
@@ -179,12 +201,14 @@ function RoadPulseApp() {
 
   useEffect(() => {
     loadSession().then((saved) => {
+      setAuthToken(saved?.token);
       setSession(saved);
       setSessionReady(true);
     });
   }, []);
 
   const handleLoggedIn = (next) => {
+    setAuthToken(next.token);
     saveSession(next);
     setSession(next);
     setActiveTab('detect');
@@ -198,6 +222,7 @@ function RoadPulseApp() {
         style: 'destructive',
         onPress: () => {
           setSettingsVisible(false);
+          logoutRequest(backendHost).finally(() => setAuthToken(null)); // cabut token di server
           clearSession();
           setSession(null);
         },
@@ -226,7 +251,7 @@ function RoadPulseApp() {
     let cancelled = false;
     (async () => {
       setApiConnected(null);
-      const ok = await fetchDashboardData(backendHost);
+      const ok = await fetchDashboardData(backendHost, loggedIn);
       if (ok || cancelled || hostSetManually.current) return;
       // Alamat utama gagal: coba kandidat lain (IP dev server, .env.local, emulator)
       for (const candidate of API_CANDIDATES) {
@@ -241,11 +266,11 @@ function RoadPulseApp() {
     return () => {
       cancelled = true;
     };
-  }, [backendHost, fetchDashboardData]);
+  }, [backendHost, fetchDashboardData, loggedIn]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchDashboardData(backendHost);
+    await fetchDashboardData(backendHost, loggedIn);
     setRefreshing(false);
   };
 
@@ -312,9 +337,15 @@ function RoadPulseApp() {
       );
 
       setPredictionResult(result);
-      fetchDashboardData(backendHost);
+      fetchDashboardData(backendHost, loggedIn);
     } catch (err) {
       console.log('Classify error:', err?.message || err);
+      if (isUnauthorized(err)) {
+        resetDetection();
+        expireSession();
+        Alert.alert('Sesi berakhir', 'Silakan masuk lagi untuk mengirim foto.');
+        return;
+      }
       if (!photoTaken) {
         Alert.alert('Gagal Mengambil Foto', err?.message || 'Coba arahkan ulang kamera lalu ambil foto lagi.');
         return;
@@ -345,7 +376,7 @@ function RoadPulseApp() {
   const saveHost = () => {
     const host = normalizeOrigin(tempIpInput);
     if (!host) {
-      Alert.alert('Alamat kosong', 'Isi dengan IP LAN komputer, contoh http://192.168.1.10:8000');
+      Alert.alert('Alamat kosong', 'Isi alamat server, contoh https://roadpulse.contoh.id atau http://192.168.1.10:8000');
       return;
     }
     setSettingsVisible(false);
@@ -353,7 +384,7 @@ function RoadPulseApp() {
     saveHostPreference(host);
     if (host === backendHost) {
       setApiConnected(null);
-      fetchDashboardData(host);
+      fetchDashboardData(host, loggedIn);
     } else {
       setBackendHost(host);
     }

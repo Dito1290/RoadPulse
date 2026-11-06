@@ -183,9 +183,9 @@ body.push(`<section class="page">${h1('bab3', '3. Peta Interaksi dan Aktor')}
 <p>Audit dilakukan pada ${code('settings.py')} (REST_FRAMEWORK), ${code('api/views.py')}, ${code('api/admin.py')}, ${code('frontend/js/*.js')}, dan kode mobile (${code('mobile/App.js')}, ${code('mobile/screens/*')}). Hasilnya: <b>tidak ada sistem role khusus aplikasi</b>. Pembedaan akses hanya berasal dari mekanisme bawaan Django: pengguna anonim, akun biasa, dan akun <i>staff/superuser</i>.</p>
 ${diagram(D.actors(), 'Diagram aktor dan hak akses. Garis menunjukkan fitur yang dapat digunakan setiap aktor. Kotak merah berisi role/fitur yang dicari tetapi tidak ditemukan dalam implementasi.')}
 ${table('Bukti implementasi otorisasi', ['Temuan', 'Bukti'], [
-  ['Semua endpoint API publik', `${code("DEFAULT_PERMISSION_CLASSES = ['rest_framework.permissions.AllowAny']")} dan ${code('permission_classes = [AllowAny]')} pada ClassifyView, DashboardStatsView, InspectionHistoryView, InspectionMapView, LoginView, RegisterView.`],
-  ['Dashboard web tidak mewajibkan login', `Fungsi ${code('authFetch()')} di ${code('frontend/js/app.js')} didefinisikan tetapi <b>tidak pernah dipanggil</b>. Diuji: setelah logout, ${code('index.html')} tetap terbuka dengan status "API terhubung".`],
-  ['Token tidak dipakai untuk akses', `Token disimpan di ${code("localStorage['rp_token']")} (web) atau AsyncStorage ${code('roadpulse:session')} (mobile) saat login, tetapi tidak dikirim pada request dashboard maupun upload. Login mobile hanya menjadi gerbang di sisi aplikasi; API tetap publik.`],
+  ['Data inspeksi wajib login', `${code("DEFAULT_PERMISSION_CLASSES = ['rest_framework.permissions.IsAuthenticated']")}; ${code('IsAuthenticated')} pada ClassifyView, DashboardStatsView, InspectionHistoryView, InspectionMapView, LogoutView. Hanya LoginView, RegisterView, ${code('/api/v1/')}, ${code('/privacy/')}, dan ${code('/healthz/')} yang publik (diuji: tanpa token → 401).`],
+  ['Dashboard web mewajibkan login', `Semua request data memakai ${code('authFetch()')} (${code('frontend/js/config.js')}) yang mengirim ${code('Authorization: Token')}; tanpa token atau saat 401, halaman kembali ke ${code('login.html')}.`],
+  ['Token dipakai web & mobile', `Token di ${code("localStorage['rp_token']")} (web) dan AsyncStorage ${code('roadpulse:session')} (mobile) dikirim pada setiap request data dan upload. Logout memanggil ${code('POST /api/v1/auth/logout/')} sehingga token dicabut di server.`],
   ['Admin dibatasi akun staff', `Django Admin menolak akun non-staff: "Please enter the correct username and password for a staff account…" (diuji).`],
   ['Tidak ada field status/role', `${code('InspectionRecord')} hanya memiliki image, class_label, confidence_score, latitude, longitude, location_name, captured_at, created_at.`],
 ], { widths: ['30%', '70%'] })}
@@ -194,7 +194,7 @@ ${table('Bukti implementasi otorisasi', ['Temuan', 'Bukti'], [
 ${h2('b3-detail', '3.1 Rincian setiap aktor')}
 ${table('Profil aktor', ['Aspek', 'Pengguna umum', 'Pengguna terdaftar', 'Administrator'], [
   ['Identitas & fungsi', 'Petugas lapangan/operator yang memotret atau mengunggah foto jalan dan melihat rekap', 'Pemilik akun Django biasa (is_staff = false)', 'Pemilik akun Django dengan is_staff/is_superuser'],
-  ['Cara akses', 'Buka dashboard web tanpa login. Aplikasi mobile kini mewajibkan login, sehingga pemakai mobile termasuk pengguna terdaftar', 'Web: login di <code>login.html</code>. Mobile: layar <b>Masuk</b>, atau buat akun di tab <b>Daftar</b>', 'Login di <code>http://127.0.0.1:8001/admin/</code>'],
+  ['Cara akses', 'Hanya dapat membuka halaman login/daftar dan Kebijakan Privasi; data inspeksi tidak dapat dilihat', 'Web: login di <code>login.html</code>. Mobile: layar <b>Masuk</b>, atau buat akun di tab <b>Daftar</b>', 'Login di <code>http://127.0.0.1:8001/admin/</code>'],
   ['Hak akses', 'Klasifikasi foto, statistik, peta, riwayat, unduh CSV (web)', 'Sama dengan pengguna umum; token tersimpan di browser/perangkat', 'Semua hak pengguna + CRUD record inspeksi, akun, grup, token'],
   ['Fitur', 'Web: upload, GPS, hasil, statistik, peta, riwayat, CSV', 'Login/logout web; aplikasi mobile lengkap (kamera, hasil, ringkasan, peta, riwayat, pengaturan, keluar), daftar akun', 'Django Admin, Swagger/ReDoc, portal API'],
   ['Batasan', 'Tidak dapat mengubah/menghapus data; tidak ada akses admin', 'Tidak dapat masuk Django Admin; token tidak memberi hak tambahan', '—'],
@@ -250,7 +250,7 @@ ${figure('w07_riwayat.png', 'Tabel riwayat (10 per halaman) dengan tombol <b>Seb
 <p>Kolom: tautan <b>Buka foto</b>, kelas, keyakinan, waktu foto/analisis, dan lokasi (nama jalan, koordinat bertaut ke OpenStreetMap, atau "Lokasi tidak tersedia").</p>
 <p>Tombol <b>Unduh CSV</b> mengambil semua halaman riwayat lalu mengunduh ${code('roadpulse-riwayat.csv')} (UTF-8 dengan BOM) berkolom ${code('kelas, confidence, waktu_foto, waktu_analisis, lokasi_jalan, latitude, longitude, image_url')}. Diuji: file berisi header + 15 record dari dua halaman riwayat.</p>
 ${h2('b4-logout', '4.7 Keluar (logout)')}
-<p>Klik <b>Keluar</b>. Token dihapus dari browser dan halaman berpindah ke login. Token di server <b>tidak</b> dihapus dan dashboard tetap dapat dibuka tanpa login (lihat Notes for Tester).</p>
+<p>Klik <b>Keluar</b>. Token dicabut di server (<code>POST /api/v1/auth/logout/</code>), dihapus dari browser, dan halaman berpindah ke login. Membuka <code>index.html</code> setelah logout langsung diarahkan kembali ke login.</p>
 ${h2('b4-ponsel', '4.8 Tampilan pada layar kecil')}
 <div class="two narrow-left">${figure('w15_web_ponsel.png', 'Dashboard web pada lebar 390 px.', { w: '70%' })}<div>${note('Dashboard bersifat responsif: menu dan tombol tersusun ulang pada layar sempit. Untuk pemakaian lapangan tersedia aplikasi mobile terpisah (Bab 5).')}</div></div>
 </section>`);
@@ -282,7 +282,7 @@ ${table('Pemetaan label kelas di aplikasi mobile', ['Kelas API', 'Label mobile',
   ['Crack', 'Retakan', 'Perlu perbaikan', 'Merah'], ['Pothole', 'Lubang', 'Perlu perbaikan', 'Merah'],
   ['Surface Erosion', 'Erosi permukaan', 'Perlu dipantau', 'Kuning/oranye'], ['Normal', 'Normal', 'Kondisi baik', 'Hijau'],
 ], { widths: ['25%', '25%', '25%', '25%'] })}
-${note('Login mobile memakai endpoint yang sama dengan login web; token disimpan di perangkat tetapi belum dikirim ke API (API tetap publik). Preferensi tema dan alamat server yang diisi manual disimpan di perangkat; bila alamat tersimpan tidak terjangkau (mis. pindah Wi-Fi), aplikasi otomatis mencoba IP komputer Expo. Kartu "Data lalu lintas dan titik kemacetan belum tersedia" di Beranda hanya informasi: fitur tersebut tidak ada di server.')}
+${note('Login mobile memakai endpoint yang sama dengan login web; token disimpan di perangkat dan dikirim pada setiap request. Bila token dicabut (401), aplikasi kembali ke layar Masuk. Preferensi tema dan alamat server yang diisi manual disimpan di perangkat; bila alamat tersimpan tidak terjangkau (mis. pindah Wi-Fi), aplikasi otomatis mencoba IP komputer Expo. Kartu "Data lalu lintas dan titik kemacetan belum tersedia" di Beranda hanya informasi: fitur tersebut tidak ada di server.')}
 </section>
 <section class="page">
 <div class="phones">${D.mobileScreens().slice(3).join('')}</div>
@@ -324,7 +324,7 @@ ${diagram(D.loginFlow(), 'Flowchart login web sesuai <code>frontend/js/login.js<
 <section class="page">
 ${happy('hp2', 'Klasifikasi foto jalan melalui web', {
   code: 'HP-02', goal: 'Mengetahui kelas kerusakan jalan dari sebuah foto dan menyimpannya beserta lokasi.',
-  pre: 'Backend & proxy berjalan, file model <code>mobilenetv2_road_damage.pt</code> tersedia, foto JPEG/PNG ≤ 10 MB.', actor: 'Semua aktor (tanpa login)',
+  pre: 'Backend & proxy berjalan, file model <code>mobilenetv2_road_damage.pt</code> tersedia, foto JPEG/PNG ≤ 10 MB.', actor: 'Pengguna terdaftar (sudah login)',
   steps: ['Klik <b>Mulai deteksi</b> atau menu <b>Deteksi jalan</b>.', 'Pilih/seret foto.', 'Klik <b>Ambil lokasi GPS</b> (opsional).', 'Klik <b>Analisis foto</b>.'],
   input: 'File foto; opsional latitude, longitude, nama lokasi, waktu foto (otomatis dari EXIF/GPS).',
   process: 'Validasi serializer → validasi ukuran/ekstensi/isi gambar → simpan record & file → koreksi orientasi EXIF, resize 224×224, normalisasi → MobileNetV2 + softmax → simpan kelas & keyakinan.',
@@ -346,7 +346,7 @@ ${happy('hp4', 'Mengunduh riwayat CSV', {
   output: '<code>roadpulse-riwayat.csv</code>.', success: 'Diuji: header + 15 record dari 2 halaman.', proof: 'Bagian 4.6.',
 })}
 ${happy('hp5', 'Deteksi jalan dari aplikasi mobile', {
-  code: 'HP-05', goal: 'Memotret jalan di lapangan dan langsung memperoleh klasifikasi.', pre: 'Expo Go, ponsel satu jaringan dengan server, izin kamera (dan lokasi).', actor: 'Pengguna umum (tanpa login)',
+  code: 'HP-05', goal: 'Memotret jalan di lapangan dan langsung memperoleh klasifikasi.', pre: 'Expo Go, ponsel satu jaringan dengan server, izin kamera (dan lokasi).', actor: 'Pengguna terdaftar (sudah login di aplikasi)',
   steps: ['Di tab <b>Beranda</b>, ketuk <b>Foto & analisis jalan</b>.', 'Arahkan ke permukaan jalan, ketuk tombol rana.', 'Tunggu "Menganalisis gambar…".', 'Baca hasil; ketuk <b>Foto lagi/Foto ulang</b> atau <b>Tutup</b>.'],
   input: 'Foto kamera, GPS perangkat.', process: 'Sama dengan HP-02 (endpoint yang sama), dikirim via XMLHttpRequest dengan batas waktu 35 detik.',
   output: 'Layar Hasil Analisis (M4); ringkasan, peta, & riwayat dimuat ulang.', success: 'Kelas, keyakinan, dan lokasi tampil tanpa pesan error.',
@@ -387,7 +387,7 @@ ${unhappy('UH-02', 'Username atau kata sandi salah', { trigger: 'Kredensial tida
 ${unhappy('UH-02b', 'Terlalu banyak percobaan login/daftar', { trigger: 'Lebih dari 10 login per menit atau 5 pendaftaran per jam dari IP yang sama.', cause: 'DRF <code>ScopedRateThrottle</code> (scope <code>login</code>/<code>register</code>).', check: '<code>LoginView</code>/<code>RegisterView</code>, <code>api/exceptions.py</code>', response: 'HTTP 429 + header <code>Retry-After</code>.', message: '"Terlalu banyak percobaan. Coba lagi dalam N detik."', fix: 'Tunggu sesuai waktu yang disebutkan. Batas dapat diubah lewat <code>THROTTLE_LOGIN</code>/<code>THROTTLE_REGISTER</code> di <code>.env</code>.' })}
 ${unhappy('UH-03', 'Server tidak terjangkau saat login', { trigger: 'Backend/proxy mati atau alamat salah.', cause: '<code>fetch</code> gagal (network error).', check: '<code>login.js</code> blok <code>catch</code>', response: 'Tombol aktif kembali, pesan tampil.', message: '"Tidak bisa terhubung ke server. Pastikan backend sudah berjalan."', fix: 'Jalankan <code>./start.sh</code> (Django 8001 + proxy 8000).' })}
 ${unhappy('UH-04', 'Akses Django Admin tanpa hak', { trigger: 'Login admin dengan akun non-staff.', cause: 'Akun tidak memiliki <code>is_staff</code>.', check: 'Form login bawaan Django Admin', response: 'Tetap di halaman login.', message: '"Please enter the correct username and password for a staff account. Note that both fields may be case-sensitive."', fix: 'Minta admin mengaktifkan status staff.' })}
-${unhappy('UH-05', 'Header token tidak valid', { trigger: 'Request API membawa <code>Authorization: Token &lt;salah&gt;</code>.', cause: 'TokenAuthentication memeriksa header sebelum AllowAny.', check: 'DRF <code>TokenAuthentication</code>', response: 'HTTP 401 walaupun endpoint publik.', message: '<code>{"error":"Invalid token."}</code>', fix: 'Hapus header atau login ulang. Client web/mobile saat ini tidak mengirim header ini.' })}
+${unhappy('UH-05', 'Header token tidak valid', { trigger: 'Request API membawa <code>Authorization: Token &lt;salah&gt;</code>.', cause: 'Token salah, kedaluwarsa, atau sudah dicabut lewat logout.', check: 'DRF <code>TokenAuthentication</code>', response: 'HTTP 401; web kembali ke <code>login.html</code>, mobile kembali ke layar Masuk.', message: '<code>{"error":"Invalid token."}</code>', fix: 'Login ulang.' })}
 </section>
 <section class="page">
 ${h2('b8-upload', '8.2 Validasi unggahan')}
@@ -467,7 +467,7 @@ ${tnTable('Fitur complete', [
 <section class="page">
 ${h2('b9-partial', '9.2 Partially complete / memiliki keterbatasan')}
 ${tnTable('Fitur parsial', [
-  tn('Login & logout web', S.part, 'authFetch() tidak dipakai; logout hanya hapus localStorage', 'Login tidak melindungi data apa pun', 'Token server tetap valid setelah logout', 'Logout → buka index.html langsung (masih terbuka)'),
+  tn('Login & logout web', S.ok, 'authFetch() di semua request; logout mencabut token di server', '—', 'Token lama ditolak (401) setelah logout', 'Logout → buka index.html langsung (diarahkan ke login)'),
   tn('Aplikasi mobile', S.part, 'Bundle Android/iOS lolos; tanpa uji perangkat', 'Perilaku di ponsel belum terbukti', 'Butuh satu jaringan dengan server', 'HP-05 di Android & iOS; uji ganti Wi-Fi, tema Terang/Gelap, peta, filter riwayat'),
   tn('Akurasi kelas Pothole', S.part, 'Recall 72,1 %; 17/68 terbaca Surface Erosion', 'Lubang dapat terlewat', 'Heuristik "pothole basah" tidak pernah aktif pada data validasi', 'Uji foto lubang basah/berlumpur'),
   tn('Waktu foto (web)', S.part, 'EXIF, cadangan <code>file.lastModified</code>', 'Waktu bisa tidak sesuai saat pemotretan', 'Foto hasil kirim ulang kehilangan EXIF', 'Unggah foto tanpa EXIF; bandingkan waktu'),
@@ -480,7 +480,7 @@ ${tnTable('Fitur yang tidak ditemukan', [
   tn('Role pelapor/verifikator', S.no, 'Tidak ada grup/permission khusus', '—', '—', '—'),
   tn('Edit/hapus dari dashboard', S.no, 'Tidak ada endpoint PUT/DELETE', 'Harus lewat admin', '—', '—'),
   tn('Filter & pencarian riwayat', S.no, 'API history hanya parameter page; filter kelas di mobile hanya pada data yang sudah dimuat', 'Sulit mencari data lama', '—', 'Filter mobile → bandingkan dengan total server'),
-  tn('Login & daftar di mobile', S.part, '<code>LoginScreen.js</code>, <code>RegisterView</code>; sesi di AsyncStorage; token belum dikirim ke API', 'Login hanya gerbang di aplikasi, data tetap publik lewat API', 'Akun mobile juga bisa login web', 'Daftar akun baru → keluar → masuk lagi; username kembar; kata sandi lemah'),
+  tn('Login & daftar di mobile', S.ok, '<code>LoginScreen.js</code>, <code>RegisterView</code>; sesi di AsyncStorage; token dikirim di setiap request (<code>services/api.js</code>)', '—', 'Akun mobile juga bisa login web', 'Daftar akun baru → keluar → masuk lagi; username kembar; kata sandi lemah'),
   tn('Reset kata sandi; notifikasi', S.no, 'Tidak ada kode terkait', '—', '—', '—'),
   tn('Automated tests', S.ok, '18 test backend (<code>api/tests.py</code>), semua lulus', 'Belum ada test frontend/mobile', 'Jalankan sebelum commit', '<code>manage.py test api</code>'),
 ])}
@@ -496,7 +496,7 @@ ${tnTable('Integrasi yang belum selesai', [
 ${h2('b9-issues', '9.5 Known issues / masalah yang diketahui')}
 ${tnTable('Masalah yang diketahui', [
   tn('KI-01 Admin lewat proxy', S.ok, '<b>Diperbaiki 3 Nov 2026</b>: proxy meneruskan header Host asli; IP LAN otomatis diizinkan saat DEBUG dan sejak 6 Nov 2026 dibaca ulang tiap request, sehingga pindah Wi-Fi/hotspot tidak memerlukan restart. Login via 8000 tidak lagi 403', '—', '—', 'Login admin via <code>http://&lt;IP-LAN&gt;:8000/admin/</code>'),
-  tn('KI-02 Token tidak valid', S.issue, 'Header token salah → 401 "Invalid token." di endpoint publik', 'Client yang menyimpan token lama akan gagal', 'Client sekarang tidak mengirim token', 'UH-05'),
+  tn('KI-02 Token tidak valid', S.ok, 'Token salah/dicabut → 401; web & mobile otomatis kembali ke login', '—', '—', 'UH-05'),
   tn('KI-03 Gagal simpan DB', S.ok, '<b>Diperbaiki 3 Nov 2026</b>: <code>save()</code> dalam <code>try</code> + <code>api/exceptions.py</code>; diuji di <code>api/tests.py</code>', 'HTTP 503 JSON dengan pesan jelas', '—', 'Matikan DB → unggah foto'),
   tn('KI-04 Hasil keyakinan rendah', S.issue, 'Contoh data uji: Crack/1002.jpg → Surface Erosion 43 %', 'Klasifikasi bisa keliru', 'Mobile memperingatkan &lt; 50 %; web tidak', 'Bandingkan label asli vs hasil'),
   tn('KI-05 Pagination', S.issue, 'page di luar rentang → 200 halaman terakhir', 'Tidak ada pesan "tidak ditemukan"', 'Perilaku Django Paginator', '<code>?page=999</code>'),
@@ -510,7 +510,7 @@ ${steps(['Penyelenggara menjalankan semua layanan dengan <code>./start.sh</code>
 ${h2('b10-dev', '10.2 Catatan pengembangan')}
 <ul class="dev">
 <li><b>Prioritas tinggi:</b> database aktif sudah PostgreSQL (kata sandi lokal <code>roadpulse</code>, ganti dengan yang kuat di server); keluarkan <code>backend/.env</code> dan <code>db.sqlite3</code> dari Git dan ganti kredensialnya; ikuti dokumen <b>Panduan Deploy &amp; Hosting</b> sebelum memasang di server.</li>
-<li><b>Keamanan & akses:</b> wajibkan autentikasi bila data tidak boleh publik (pakai <code>authFetch</code> dan permission <code>IsAuthenticated</code>); hapus token di server saat logout.</li>
+<li><b>Keamanan & akses:</b> data sudah wajib login dan unggah dibatasi per akun (<code>THROTTLE_CLASSIFY</code>); pertimbangkan masa berlaku token dan peran pelapor/verifikator.</li>
 <li><b>Fitur laporan:</b> tambahkan field status dan alur verifikasi bila dibutuhkan dinas; tambahkan filter riwayat dan endpoint detail.</li>
 <li><b>Kualitas AI:</b> tambah foto lubang basah/berlumpur/malam dari lapangan, lalu latih ulang dengan <code>ai_model/train.py</code> dan bandingkan memakai <code>--eval</code>.</li>
 <li><b>Kualitas perangkat lunak:</b> tambah test untuk frontend/mobile dan uji aplikasi di HP Android &amp; iPhone sungguhan.</li>
@@ -518,12 +518,14 @@ ${h2('b10-dev', '10.2 Catatan pengembangan')}
 ${h2('b10-lampiran', 'Lampiran A · Daftar endpoint API')}
 ${table('Endpoint API', ['Method', 'Endpoint', 'Fungsi', 'Akses'], [
   ['GET', '<code>/api/v1/</code>', 'Daftar endpoint', 'Publik'],
-  ['POST', '<code>/api/v1/classify/</code>', 'Klasifikasi foto (multipart)', 'Publik'],
-  ['GET', '<code>/api/v1/dashboard/stats/</code>', 'Total, distribusi, 5 terbaru', 'Publik'],
-  ['GET', '<code>/api/v1/dashboard/history/?page=N</code>', 'Riwayat 10 per halaman', 'Publik'],
-  ['GET', '<code>/api/v1/dashboard/map/</code>', 'Titik ber-GPS (maks. 1000)', 'Publik'],
+  ['POST', '<code>/api/v1/classify/</code>', 'Klasifikasi foto (multipart), maks. 120/jam per akun', 'Token'],
+  ['GET', '<code>/api/v1/dashboard/stats/</code>', 'Total, distribusi, 5 terbaru', 'Token'],
+  ['GET', '<code>/api/v1/dashboard/history/?page=N</code>', 'Riwayat 10 per halaman', 'Token'],
+  ['GET', '<code>/api/v1/dashboard/map/</code>', 'Titik ber-GPS (maks. 1000)', 'Token'],
   ['POST', '<code>/api/v1/auth/login/</code>', 'Token login', 'Publik'],
   ['POST', '<code>/api/v1/auth/register/</code>', 'Daftar akun biasa + token (HTTP 201)', 'Publik'],
+  ['POST', '<code>/api/v1/auth/logout/</code>', 'Mencabut token (HTTP 204)', 'Token'],
+  ['GET', '<code>/privacy/</code>, <code>/healthz/</code>', 'Kebijakan Privasi; health check server & database', 'Publik'],
   ['GET', '<code>/api/docs/</code>, <code>/api/redoc/</code>, <code>/api/schema/</code>', 'Dokumentasi OpenAPI', 'Publik'],
   ['—', '<code>/admin/</code>', 'Django Admin', 'Staff'],
 ], { widths: ['10%', '42%', '33%', '15%'] })}

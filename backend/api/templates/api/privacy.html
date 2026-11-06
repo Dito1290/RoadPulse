@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#102b26">
+    <title>Kebijakan Privasi | RoadPulse</title>
+    <style>
+        :root { color-scheme: light; font-family: Inter, "Segoe UI", sans-serif; color: #192b27; background: #f3f6f2; }
+        * { box-sizing: border-box; }
+        body { margin: 0; line-height: 1.65; }
+        main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0 56px; }
+        h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+        h2 { font-size: 1.15rem; margin: 32px 0 8px; }
+        .muted { color: #5b6d68; font-size: 0.92rem; }
+        ul { padding-left: 1.25rem; }
+        li { margin: 4px 0; }
+        a { color: #087a5b; }
+        .card { background: #fff; border: 1px solid #dfe7e3; border-radius: 14px; padding: 18px 20px; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Kebijakan Privasi RoadPulse</h1>
+    <p class="muted">Berlaku sejak {{ effective_date }}</p>
+
+    <p>RoadPulse adalah aplikasi pendataan kerusakan jalan. Kebijakan ini menjelaskan data apa yang kami kumpulkan saat Anda memakai dashboard web dan aplikasi mobile RoadPulse, untuk apa data itu dipakai, dan hak Anda atas data tersebut, sesuai Undang-Undang Nomor 27 Tahun 2022 tentang Pelindungan Data Pribadi.</p>
+
+    <h2>1. Data yang kami kumpulkan</h2>
+    <ul>
+        <li><b>Akun</b>: username dan kata sandi. Kata sandi disimpan dalam bentuk terenkripsi (hash) dan tidak dapat dibaca oleh siapa pun, termasuk pengelola.</li>
+        <li><b>Foto jalan</b> yang Anda ambil atau unggah, beserta hasil analisisnya (jenis kerusakan dan tingkat keyakinan).</li>
+        <li><b>Lokasi</b>: koordinat GPS dan nama lokasi saat foto diambil, bila Anda memberikan izin lokasi. Foto tetap dapat dianalisis tanpa lokasi.</li>
+        <li><b>Waktu</b> pengambilan dan pengiriman foto.</li>
+        <li><b>Alamat IP</b>, dipakai sementara untuk membatasi percobaan masuk dan pendaftaran demi keamanan, serta tercatat di log server.</li>
+    </ul>
+
+    <h2>2. Tujuan penggunaan data</h2>
+    <ul>
+        <li>Mengenali jenis kerusakan jalan dari foto dan menyimpannya sebagai laporan inspeksi.</li>
+        <li>Menampilkan statistik, peta, dan riwayat inspeksi kepada pengguna yang sudah masuk.</li>
+        <li>Menjaga keamanan layanan, misalnya mencegah penebakan kata sandi dan pembuatan akun palsu.</li>
+    </ul>
+    <p>Kami tidak menjual data Anda dan tidak memakainya untuk iklan.</p>
+
+    <h2>3. Siapa yang dapat melihat data</h2>
+    <p>Laporan inspeksi (foto, lokasi, waktu, dan hasil analisis) dapat dilihat oleh seluruh pengguna RoadPulse yang sudah masuk, karena tujuan aplikasi adalah memetakan kondisi jalan bersama. Username Anda tidak ditampilkan pada laporan. Administrator dapat mengubah atau menghapus laporan dan akun.</p>
+
+    <h2>4. Layanan pihak ketiga</h2>
+    <ul>
+        <li><b>OpenStreetMap</b> untuk menampilkan peta, dan <b>Nominatim (OpenStreetMap)</b> untuk mengubah koordinat menjadi nama jalan pada dashboard web. Koordinat dikirim ke layanan ini saat nama lokasi dicari.</li>
+        <li>Aplikasi mobile memakai layanan lokasi bawaan perangkat (Android/iOS) untuk mencari nama jalan.</li>
+    </ul>
+
+    <h2>5. Penyimpanan dan keamanan</h2>
+    <p>Data disimpan di server RoadPulse dan dikirim melalui koneksi terenkripsi (HTTPS). Akses ke data inspeksi memerlukan login. Laporan disimpan selama masih dibutuhkan untuk pemantauan jalan, atau sampai dihapus atas permintaan Anda.</p>
+
+    <h2>6. Hak Anda</h2>
+    <p>Anda berhak meminta salinan data Anda, memperbaiki data yang keliru, menghapus akun beserta laporan yang Anda kirim, serta menarik izin kamera dan lokasi kapan saja melalui pengaturan perangkat.</p>
+
+    <h2>7. Kontak</h2>
+    <div class="card">
+        <p style="margin:0">Untuk pertanyaan atau permintaan terkait data pribadi, hubungi pengelola RoadPulse:
+        {% if contact_email %}<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}melalui administrator aplikasi{% endif %}.</p>
+    </div>
+
+    <p class="muted" style="margin-top:28px">Kebijakan ini dapat diperbarui. Perubahan penting akan diberitahukan melalui aplikasi.</p>
+</main>
+</body>
+</html>

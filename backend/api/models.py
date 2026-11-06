@@ -1,4 +1,15 @@
+import os
+import uuid
+
 from django.db import models
+
+
+def inspection_upload_path(_instance, filename):
+    """Nama file acak agar alamat foto di /media/ tidak bisa ditebak."""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png'):
+        ext = '.jpg'
+    return f'uploads/{uuid.uuid4().hex}{ext}'
 
 
 class InspectionRecord(models.Model):
@@ -11,7 +22,7 @@ class InspectionRecord(models.Model):
         ('Normal', 'Normal'),
     ]
     
-    image = models.ImageField(upload_to='uploads/')
+    image = models.ImageField(upload_to=inspection_upload_path)
     class_label = models.CharField(max_length=20, choices=CLASS_CHOICES)
     confidence_score = models.FloatField()
     latitude = models.FloatField(null=True, blank=True)

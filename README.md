@@ -50,7 +50,8 @@ RoadPulse/
 ├── USERMANUAL/         # User Manual (.docx & .pdf) + source/ untuk membangun ulang
 ├── docs/               # dokumen desain & audit aplikasi mobile
 ├── dataset/            # Crack/, Normal/, Pothole/, Surface Erosion/ (untuk training)
-└── start.sh            # menjalankan semua layanan dengan satu perintah
+├── deploy/             # paket produksi: docker-compose.yml, Caddyfile, .env.example, README.md
+└── start.sh            # menjalankan semua layanan dengan satu perintah (development)
 ```
 
 ## 🛠️ Tech Stack (sesuai file proyek)
@@ -176,7 +177,7 @@ Scan QR code dengan Expo Go (Android) atau aplikasi Kamera (iOS).
 | Halaman | URL |
 |---|---|
 | Web dashboard | http://localhost:3000 |
-| Login dashboard (opsional, token API) | http://localhost:3000/login.html |
+| Login dashboard (wajib sebelum membuka data) | http://localhost:3000/login.html |
 | API root | http://localhost:8000/api/v1/ |
 | Swagger UI | http://localhost:8000/api/docs/ |
 | ReDoc | http://localhost:8000/api/redoc/ |
@@ -198,6 +199,11 @@ Frontend otomatis memanggil API di `http://<hostname halaman>:8000`, jadi dashbo
 | `DB_ENGINE` | `postgresql` | `postgresql` atau `sqlite` |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | `roadpulse_db`, `postgres`, kosong, `127.0.0.1`, `5432` | Koneksi PostgreSQL (nilai proyek ada di `backend/.env.example`) |
 | `SQLITE_PATH` | `backend/db.sqlite3` | Lokasi file SQLite bila `DB_ENGINE=sqlite` |
+| `THROTTLE_LOGIN`, `THROTTLE_REGISTER`, `THROTTLE_CLASSIFY` | `10/min`, `5/hour`, `120/hour` | Batas percobaan login/daftar per IP dan unggah foto per akun |
+| `CORS_ALLOWED_ORIGINS` | kosong | Produksi: domain lain yang boleh memanggil API (dipisah koma) |
+| `CSRF_TRUSTED_ORIGINS` | kosong | Produksi: mis. `https://roadpulse.contoh.id` untuk login Django Admin |
+| `PRIVACY_CONTACT_EMAIL` | kosong | Email kontak di halaman `/privacy/` |
+| `NUM_PROXIES` | `1` | Jumlah reverse proxy di depan Django (proxy.js atau Caddy) |
 
 `mobile/.env.local` / `mobile/.env`: `EXPO_PUBLIC_API_URL` (alamat proxy, mis. `http://192.168.1.10:8000`). Tanpa variabel ini aplikasi memakai `http://10.0.2.2:8000` (emulator Android) atau `http://localhost:8000` (simulator iOS) yang **tidak** berfungsi di HP fisik.
 
@@ -205,19 +211,25 @@ File `.env` berisi konfigurasi/rahasia lokal dan tidak boleh di-commit (sudah ad
 
 ## 📡 API Endpoints
 
-| Method | Endpoint | Keterangan |
-|---|---|---|
-| GET | `/api/v1/` | Daftar endpoint |
-| POST | `/api/v1/classify/` | Upload gambar (multipart) → klasifikasi |
-| GET | `/api/v1/dashboard/stats/` | Total, distribusi kelas, 5 inspeksi terbaru |
-| GET | `/api/v1/dashboard/history/?page=N` | Riwayat, 10 per halaman |
-| GET | `/api/v1/dashboard/map/` | Titik inspeksi ber-GPS (maks. 1000) |
-| POST | `/api/v1/auth/login/` | `{username, password}` → `{token, username}` |
-| POST | `/api/v1/auth/register/` | `{username, password, password_confirm}` → `{token, username}` (201) |
+Endpoint data **wajib login**: kirim header `Authorization: Token <token>` (token dari login/daftar). Tanpa token → `401`.
+
+| Method | Endpoint | Akses | Keterangan |
+|---|---|---|---|
+| GET | `/api/v1/` | Publik | Daftar endpoint |
+| POST | `/api/v1/auth/login/` | Publik | `{username, password}` → `{token, username}` (maks. 10/menit per IP) |
+| POST | `/api/v1/auth/register/` | Publik | `{username, password, password_confirm}` → `{token, username}` (201, maks. 5/jam per IP) |
+| POST | `/api/v1/auth/logout/` | Token | Mencabut token di server (204) |
+| POST | `/api/v1/classify/` | Token | Upload gambar (multipart) → klasifikasi (maks. 120/jam per akun) |
+| GET | `/api/v1/dashboard/stats/` | Token | Total, distribusi kelas, 5 inspeksi terbaru |
+| GET | `/api/v1/dashboard/history/?page=N` | Token | Riwayat, 10 per halaman |
+| GET | `/api/v1/dashboard/map/` | Token | Titik inspeksi ber-GPS (maks. 1000) |
+| GET | `/privacy/` | Publik | Kebijakan Privasi |
+| GET | `/healthz/` | Publik | Cek kesehatan server & database |
 
 ### POST `/api/v1/classify/`
 ```bash
 curl -X POST http://localhost:8000/api/v1/classify/ \
+  -H "Authorization: Token <token>" \
   -F "image=@road.jpg" \
   -F "latitude=-5.4292" \
   -F "longitude=105.2610" \
@@ -272,7 +284,7 @@ Training: 8 epoch classifier head + 3 epoch fine-tuning, split 80/20 (seed 42). 
 
 ```bash
 cd backend
-venv311/bin/python manage.py test api      # 18 test: classify, validasi, dashboard, login, daftar, batas percobaan
+venv311/bin/python manage.py test api      # 23 test: classify, validasi, dashboard, login, daftar, logout, wajib login, batas percobaan
 venv311/bin/python ai_model/train.py --eval ai_model/mobilenetv2_road_damage.pt   # akurasi model per kelas
 ```
 
@@ -292,9 +304,20 @@ Login dibatasi 10 percobaan/menit dan pendaftaran 5/jam per IP (ubah lewat `THRO
 
 ## 🚦 Production Deployment
 
-**Backend:** `DEBUG=False`, `SECRET_KEY` & `ALLOWED_HOSTS` dari env, PostgreSQL, Gunicorn + nginx (nginx menggantikan proxy.js dan melayani `/media/`), HTTPS
-**Frontend:** Hosting statis (Vercel/Netlify), set `rp_api_origin` atau ubah `frontend/js/config.js` ke domain API
-**Mobile:** Build via Expo EAS dengan `EXPO_PUBLIC_API_URL` mengarah ke API HTTPS
+Paket siap pakai ada di folder [`deploy/`](deploy/README.md): **Docker Compose** berisi PostgreSQL, Django + Gunicorn, dan **Caddy** (HTTPS Let's Encrypt otomatis, dashboard web, `/media/`, `/static/`) di satu domain. Ringkasnya:
+
+```bash
+cd deploy
+cp .env.example .env      # isi DOMAIN, ACME_EMAIL, SECRET_KEY, DB_PASSWORD, PRIVACY_CONTACT_EMAIL
+docker compose up -d --build
+docker compose exec backend python manage.py createsuperuser
+```
+
+Langkah lengkap (VPS, file model, pindah data, backup, build APK) ada di [`deploy/README.md`](deploy/README.md).
+
+- **Keamanan produksi** (`DEBUG=False`): server menolak start bila `SECRET_KEY` lemah; HTTPS redirect, HSTS, cookie aman, `X-Frame-Options: DENY`; CORS hanya untuk `CORS_ALLOWED_ORIGINS`; `manage.py check --deploy` bersih.
+- **Dashboard web** otomatis memakai domain yang sama untuk API (tidak perlu mengubah `config.js`).
+- **Mobile**: ganti domain di `mobile/eas.json`, lalu `eas build -p android --profile preview` (APK) atau `--profile production` (Play Store).
 
 ## 📝 License
 

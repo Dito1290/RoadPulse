@@ -22,3 +22,4 @@ backend/media/uploads/
 .logs/
 backend/db.sqlite3
 USERMANUAL/arsip/
+backend/staticfiles/

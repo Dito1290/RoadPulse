@@ -150,3 +150,4 @@ label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: 8px;
     .left { display: none; }
     .right { flex: 1; }
 }
+.foot.legal { margin-top: 12px; font-size: .78rem; }

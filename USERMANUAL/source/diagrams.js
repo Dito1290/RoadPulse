@@ -85,7 +85,7 @@ function actors() {
     <path d="M${cx - 15},${cy + 14} Q${cx},${cy - 10} ${cx + 15},${cy + 14}" fill="none" stroke="${color}" stroke-width="2"/>`;
   let b = '';
   const A = [
-    { y: 60, c: T.sky, t: 'Pengguna umum', s: ['tanpa login (web)'] },
+    { y: 60, c: T.sky, t: 'Pengunjung', s: ['belum login'] },
     { y: 175, c: T.teal, t: 'Pengguna terdaftar', s: ['akun Django non-staff', '(login web/mobile → token)'] },
     { y: 300, c: T.maroon, t: 'Administrator', s: ['akun is_staff / superuser'] },
   ];
@@ -94,21 +94,21 @@ function actors() {
     [20, 'Klasifikasi foto jalan (web & mobile)'],
     [62, 'Lihat statistik, peta, riwayat'],
     [104, 'Unduh CSV riwayat (web)'],
-    [146, 'Login web/mobile, daftar (mobile)'],
-    [188, 'Logout (hapus token di browser)'],
+    [146, 'Login & daftar (web/mobile)'],
+    [188, 'Logout (token dicabut di server)'],
     [230, 'Login Django Admin'],
     [272, 'Ubah / hapus record inspeksi'],
     [314, 'Kelola akun, grup, token'],
   ];
   U.forEach(([y, t]) => { b += `<rect x="330" y="${y}" width="270" height="32" rx="16" fill="${T.grey}" stroke="${T.line}"/>` + text(465, y + 16, t, { size: 11 }); });
   const link = (ay, uy, c) => `<line x1="120" y1="${ay}" x2="330" y2="${uy + 16}" stroke="${c}" stroke-width="1.3"/>`;
-  [0, 1, 2].forEach((i) => { b += link(60, U[i][0], T.sky); });
+  [3].forEach((i) => { b += link(60, U[i][0], T.sky); });
   [0, 1, 2, 3, 4].forEach((i) => { b += link(175, U[i][0], T.teal); });
   [0, 1, 2, 3, 4, 5, 6, 7].forEach((i) => { b += link(300, U[i][0], T.maroon); });
   b += `<rect x="640" y="20" width="170" height="326" rx="8" fill="#fff" stroke="${T.red}" stroke-dasharray="5 4"/>`;
   b += text(725, 40, 'Tidak ditemukan di kode', { size: 11, weight: 700, fill: T.red });
-  ['Role pelapor / verifikator', 'Verifikasi laporan', 'Status laporan', 'Pembatasan akses API', '(semua endpoint AllowAny)'].forEach((t, i) => { b += text(725, 75 + i * 22, t, { size: 10.5, fill: T.soft }); });
-  b += text(725, 225, ['Catatan: login web tidak', 'diwajibkan untuk membuka', 'dashboard; token tidak', 'dikirim ke API mana pun.'], { size: 10, fill: T.soft });
+  ['Role pelapor / verifikator', 'Verifikasi laporan', 'Status laporan'].forEach((t, i) => { b += text(725, 75 + i * 22, t, { size: 10.5, fill: T.soft }); });
+  b += text(725, 225, ['Catatan: data inspeksi', 'wajib login (token);', 'pengunjung hanya dapat', 'login, daftar, & privasi.'], { size: 10, fill: T.soft });
   return svg(815, 350, b);
 }
 

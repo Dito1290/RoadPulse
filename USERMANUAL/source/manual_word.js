@@ -215,10 +215,10 @@ add(
   ], [0.22, 0.25, 0.53]),
   P(`Untuk mengenali kelas tersebut, RoadPulse memakai model MobileNetV2 yang dilatih dengan 1.882 foto jalan. Pada pengujian dengan 377 foto yang tidak dipakai saat pelatihan, model menebak dengan benar ${MODEL.benar} foto atau sekitar ${MODEL.akurasi}%. Karena hasilnya tidak selalu tepat, aplikasi juga menampilkan **tingkat keyakinan** untuk setiap hasil. Jika tingkat keyakinan di bawah 50%, aplikasi akan menyarankan agar foto diambil ulang.`),
   SUB('1.4', 'Pengguna Aplikasi'),
-  P('Pengguna RoadPulse dibagi menjadi tiga jenis sesuai hak aksesnya.'),
+  P('Pengguna RoadPulse dibagi menjadi tiga jenis sesuai hak aksesnya. Seluruh data inspeksi hanya dapat dilihat dan dikirim setelah pengguna masuk dengan akunnya.'),
   ...TABEL('Jenis pengguna RoadPulse', ['Pengguna', 'Hak akses'], [
-    ['Pengguna umum', 'Dapat membuka dashboard web untuk melihat statistik, peta, dan riwayat, serta mengunggah foto untuk dianalisis.'],
-    ['Pengguna terdaftar', 'Memiliki akun dan dapat masuk ke dashboard web maupun aplikasi mobile. Aplikasi mobile hanya dapat dipakai setelah masuk. Akun dapat dibuat sendiri melalui menu Daftar.'],
+    ['Pengunjung', 'Belum masuk. Hanya dapat membuka halaman masuk, membuat akun melalui menu Daftar, dan membaca Kebijakan Privasi.'],
+    ['Pengguna terdaftar', 'Memiliki akun dan dapat masuk ke dashboard web maupun aplikasi mobile untuk mengunggah foto serta melihat statistik, peta, dan riwayat. Akun dapat dibuat sendiri melalui menu Daftar.'],
     ['Administrator', 'Memiliki semua hak pengguna terdaftar, ditambah akses ke halaman admin untuk mengubah atau menghapus data inspeksi dan mengelola akun.'],
   ], [0.28, 0.72]),
 );
@@ -358,7 +358,7 @@ add(
   ...GAMBAR('web_riwayat.png', 'Riwayat inspeksi'),
   P('Untuk menyimpan seluruh riwayat ke dalam file, klik tombol **Unduh CSV** di bagian atas halaman. File `roadpulse-riwayat.csv` akan terunduh dan dapat dibuka menggunakan Microsoft Excel.'),
   SUB('3.9', 'Keluar'),
-  P('Klik tombol **Keluar** di pojok kanan atas. Halaman akan kembali ke halaman masuk.'),
+  P('Klik tombol **Keluar** di pojok kanan atas. Sesi login dicabut di server dan halaman kembali ke halaman masuk. Jika sesi berakhir, misalnya karena akun keluar dari perangkat lain, dashboard juga otomatis kembali ke halaman masuk.'),
 );
 
 // ── BAB IV ──
@@ -405,7 +405,7 @@ add(
     '**Akun**, menampilkan username yang sedang dipakai dan tombol **Keluar** untuk keluar dari akun.',
     '**Tampilan**, untuk memilih tema Sistem, Terang, atau Gelap.',
     '**Server backend**, untuk mengisi alamat server secara manual, misalnya `http://192.168.1.22:8000`, lalu ketuk **Simpan & hubungkan**. Alamat ini tersimpan di HP. Bagian ini biasanya tidak perlu diubah karena aplikasi sudah mencari alamat server secara otomatis.',
-    '**Tentang**, berisi versi aplikasi dan sumber foto yang dipakai.',
+    '**Tentang**, berisi versi aplikasi, sumber foto yang dipakai, dan tombol **Kebijakan Privasi**.',
   ]),
   ...GAMBAR_HP([['hp_9.png', 'Halaman Pengaturan'], ['hp_10.png', 'Beranda dengan tema Terang']]),
 );
@@ -503,8 +503,8 @@ add(
   P('Beberapa hal yang dapat dikembangkan pada RoadPulse ke depannya adalah sebagai berikut.'),
   ...HURUF([
     'Menambah jumlah foto jalan berlubang dalam berbagai kondisi, seperti saat basah, berlumpur, atau malam hari, agar ketepatan model meningkat.',
-    'Memasang aplikasi di server agar dapat diakses tanpa harus menyalakan laptop. Langkah-langkahnya dijelaskan dalam dokumen terpisah, yaitu Panduan Deploy dan Hosting RoadPulse.',
-    'Mewajibkan login untuk seluruh data agar hanya pengguna terdaftar yang dapat melihat dan mengirim laporan.',
+    'Memasang aplikasi di server agar dapat diakses tanpa harus menyalakan laptop. Paket deploy sudah tersedia di folder `deploy/` beserta panduannya di `deploy/README.md`.',
+    'Membuat build aplikasi mobile (APK atau AAB) dengan EAS Build agar dapat dipasang tanpa Expo Go dan diterbitkan di Play Store.',
     'Menambahkan status tindak lanjut laporan, misalnya baru, sudah diperiksa, dan sudah diperbaiki.',
     'Menguji aplikasi mobile secara langsung di lapangan dengan beberapa jenis HP.',
   ]),

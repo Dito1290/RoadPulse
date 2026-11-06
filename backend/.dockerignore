@@ -1,0 +1,15 @@
+# Tidak ikut ke image Docker
+venv/
+venv311/
+.venv/
+__pycache__/
+*.pyc
+.env
+db.sqlite3
+db_backups/
+media/
+staticfiles/
+node_modules/
+package-lock.json
+proxy.js
+*.candidate.pt

@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { useStyles, useTheme } from '../theme/ThemeContext';
@@ -81,8 +81,8 @@ export default function SettingsSheet({ visible, onClose, host, apiConnected, dr
               <Overline>Koneksi</Overline>
               <Text style={s.sectionTitle}>Server backend</Text>
               <Text style={s.desc}>
-                Isi dengan IP LAN komputer yang menjalankan proxy RoadPulse (port 8000). Di HP fisik jangan pakai localhost; HP dan komputer harus
-                satu jaringan Wi-Fi.
+                Isi dengan alamat server RoadPulse, misalnya https://roadpulse.contoh.id. Saat uji coba lokal, pakai IP LAN komputer yang
+                menjalankan proxy RoadPulse (port 8000); HP dan komputer harus satu jaringan Wi-Fi.
               </Text>
               <View style={s.status}><StatusDot color={api.color} /><Text style={s.statusText} numberOfLines={2}>{api.text}</Text></View>
               <TextInput
@@ -111,6 +111,12 @@ export default function SettingsSheet({ visible, onClose, host, apiConnected, dr
                 Foto Menara Siger, Bakauheni, Lampung Selatan: Sakurai Midori, Wikimedia Commons, CC BY 2.5 (dipotong). Ornamen Siger & motif Tapis
                 digambar ulang untuk aplikasi ini.
               </Text>
+              <Button
+                title="Kebijakan Privasi"
+                variant="ghost"
+                onPress={() => Linking.openURL(`${host}/privacy/`).catch(() => {})}
+                style={{ marginTop: theme.spacing.sm }}
+              />
               <View style={{ marginTop: theme.spacing.lg, alignItems: 'center' }}><TapisLine color={c.heritage} count={18} opacity={0.4} /></View>
             </View>
 

@@ -1,0 +1,43 @@
+# Caddy mengurus sertifikat HTTPS (Let's Encrypt) secara otomatis untuk {$DOMAIN}.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Foto maksimal 10 MB (+ field form)
+	request_body {
+		max_size 12MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=2592000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# API, admin, kebijakan privasi, health check -> Django (Gunicorn)
+	@django path /api /api/* /admin /admin/* /privacy /privacy/* /healthz /healthz/*
+	handle @django {
+		reverse_proxy backend:8000
+	}
+
+	# File statis Django (admin) dan foto hasil unggahan
+	handle_path /static/* {
+		root * /srv/static
+		file_server
+	}
+	handle_path /media/* {
+		root * /srv/media
+		header Cache-Control "private, max-age=86400"
+		file_server
+	}
+
+	# Dashboard web
+	handle {
+		root * /srv/frontend
+		file_server
+	}
+}

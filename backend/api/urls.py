@@ -5,6 +5,7 @@ from .views import (
     InspectionHistoryView,
     InspectionMapView,
     LoginView,
+    LogoutView,
     RegisterView,
     api_v1_root,
 )
@@ -17,4 +18,5 @@ urlpatterns = [
     path('dashboard/map/', InspectionMapView.as_view(), name='dashboard-map'),
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/register/', RegisterView.as_view(), name='register'),
+    path('auth/logout/', LogoutView.as_view(), name='logout'),
 ]

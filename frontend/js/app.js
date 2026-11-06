@@ -31,16 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboard();
 });
 
-
-function authFetch(url, options = {}) {
-  const token = localStorage.getItem('rp_token');
-  if (!token) { window.location.href = 'login.html'; return Promise.reject(new Error('Belum login')); }
-  options.headers = { ...(options.headers || {}), Authorization: `Token ${token}` };
-  return fetch(url, options).then((res) => {
-    if (res.status === 401) { localStorage.removeItem('rp_token'); window.location.href = 'login.html'; }
-    return res;
-  });
-}
 function setupEventListeners() {
     // Upload area click
     uploadArea.addEventListener('click', () => {
@@ -90,9 +80,16 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+        // Cabut token di server juga; tetap keluar walaupun server tidak terjangkau.
+        const token = localStorage.getItem('rp_token');
+        if (token) {
+            try {
+                await fetch(`${API_BASE_URL}/auth/logout/`, { method: 'POST', headers: { Authorization: `Token ${token}` } });
+            } catch (_) {}
+        }
         localStorage.removeItem('rp_token');
-        window.location.href = 'login.html';
+        window.location.replace('login.html');
     });
 
     document.getElementById('startDetectionBtn').addEventListener('click', () => {
@@ -232,7 +229,7 @@ async function classifyImage() {
     if (selectedLocationName) formData.append('location_name', selectedLocationName);
 
     try {
-        const response = await fetch(`${API_BASE_URL}/classify/`, {
+        const response = await authFetch(`${API_BASE_URL}/classify/`, {
             method: 'POST',
             body: formData
         });
