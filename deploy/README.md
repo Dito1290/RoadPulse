@@ -15,7 +15,7 @@ Paket ini sudah diuji utuh dengan Docker: HTTPS, login wajib (tanpa token → 40
 > **Server bersama yang sudah memakai nginx** (mis. server kampus `roadpulse.iet-polinela.my.id`):
 > jangan pakai `docker-compose.yml` (Caddy-nya memakai port 80/443 dan akan bentrok).
 > Pakai `docker-compose.nginx.yml` (hanya membuka `127.0.0.1:ROADPULSE_PORT`) dan tempel
-> `nginx/roadpulse.conf` ke file config nginx milik roadpulse, lalu HTTPS dengan certbot.
+> `nginx/roadpulse.conf` ke file config nginx milik roadpulse. Domain kampus lewat Cloudflare, jadi HTTPS memakai sertifikat Cloudflare Origin yang sudah ada di server (tanpa certbot).
 > Semua perintah: `sudo docker compose -f docker-compose.nginx.yml ...`.
 
 ## 1. Yang perlu disiapkan

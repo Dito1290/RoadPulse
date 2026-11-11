@@ -2,7 +2,7 @@
 # (mis. server kampus roadpulse.iet-polinela.my.id).
 #
 # Beda dengan docker-compose.yml (VPS sendiri):
-#   - TIDAK membuka port 80/443 dan TIDAK mengurus HTTPS. HTTPS dipegang nginx + certbot di server.
+#   - TIDAK membuka port 80/443 dan TIDAK mengurus HTTPS. HTTPS dipegang nginx server (sertifikat Cloudflare Origin / certbot).
 #   - Semua layanan hanya bisa diakses dari server itu sendiri lewat 127.0.0.1:${ROADPULSE_PORT}.
 #     nginx server meneruskan https://DOMAIN -> http://127.0.0.1:${ROADPULSE_PORT} (lihat nginx/roadpulse.conf).
 #
