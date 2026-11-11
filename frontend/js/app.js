@@ -187,7 +187,10 @@ async function setPhotoLocation(latitude, longitude) {
             zoom: 18,
             addressdetails: 1
         });
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${query}`);
+        // Nominatim juga mewajibkan Referer (lihat catatan tile di dashboard.js)
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${query}`, {
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
         if (response.ok) {
             const result = await response.json();
             const address = result.address || {};

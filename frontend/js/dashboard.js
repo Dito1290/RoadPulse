@@ -54,8 +54,11 @@ function updateInspectionMap(points) {
     if (!inspectionMap) {
         inspectionMap = L.map(mapElement).setView([-5.429, 105.262], 12);
         inspectionMarkers = L.featureGroup().addTo(inspectionMap);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // OSM menolak (403 "Access blocked") request tile tanpa Referer. Server mengirim
+        // Referrer-Policy: same-origin, jadi izinkan domain (tanpa path) khusus untuk tile.
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
+            referrerPolicy: 'strict-origin-when-cross-origin',
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(inspectionMap);
     }
