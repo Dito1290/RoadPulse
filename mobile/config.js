@@ -36,8 +36,12 @@ const EMULATOR_ORIGIN = Platform.OS === 'android'
   ? `http://10.0.2.2:${API_PORT}`
   : `http://localhost:${API_PORT}`;
 
-export const DEFAULT_API_ORIGIN = DEV_SERVER_ORIGIN || ENV_ORIGIN || EMULATOR_ORIGIN;
+// EXPO_PUBLIC_API_URL berupa https = server produksi (mis. server kampus): dipakai lebih dulu,
+// juga saat dibuka lewat Expo Go. Alamat http (LAN, dari start.sh) tetap kalah dari IP Expo.
+const PREFER_ENV = /^https:\/\//i.test(ENV_ORIGIN);
+
+export const DEFAULT_API_ORIGIN = (PREFER_ENV && ENV_ORIGIN) || DEV_SERVER_ORIGIN || ENV_ORIGIN || EMULATOR_ORIGIN;
 
 // Dicoba berurutan bila alamat utama tidak bisa dijangkau.
-export const API_CANDIDATES = [DEV_SERVER_ORIGIN, ENV_ORIGIN, EMULATOR_ORIGIN]
+export const API_CANDIDATES = [PREFER_ENV ? ENV_ORIGIN : '', DEV_SERVER_ORIGIN, ENV_ORIGIN, EMULATOR_ORIGIN]
   .filter((origin, i, all) => origin && all.indexOf(origin) === i);
