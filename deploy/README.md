@@ -12,6 +12,12 @@ Semua di bawah satu domain: `https://DOMAIN/` (dashboard), `/api/` (API), `/admi
 
 Paket ini sudah diuji utuh dengan Docker: HTTPS, login wajib (tanpa token → 401), unggah foto dengan model asli, logout mencabut token, login Django Admin, batas unggah 12 MB (413), batas percobaan login yang tidak bisa diakali header `X-Forwarded-For`, pindah data lama, dan data tetap ada setelah restart.
 
+> **Server bersama yang sudah memakai nginx** (mis. server kampus `roadpulse.iet-polinela.my.id`):
+> jangan pakai `docker-compose.yml` (Caddy-nya memakai port 80/443 dan akan bentrok).
+> Pakai `docker-compose.nginx.yml` (hanya membuka `127.0.0.1:ROADPULSE_PORT`) dan tempel
+> `nginx/roadpulse.conf` ke file config nginx milik roadpulse, lalu HTTPS dengan certbot.
+> Semua perintah: `sudo docker compose -f docker-compose.nginx.yml ...`.
+
 ## 1. Yang perlu disiapkan
 
 - **VPS Linux** (Ubuntu 22.04/24.04 disarankan) dengan **RAM minimal 2 GB** (4 GB lebih nyaman; model AI memakai ±300 MB per worker) dan disk ±10 GB.

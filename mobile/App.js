@@ -258,7 +258,10 @@ function RoadPulseApp() {
         if (candidate === backendHost) continue;
         try {
           await requestJson(`${candidate}/api/v1/`, 3000);
-          if (!cancelled) setBackendHost(candidate);
+          if (cancelled) return;
+          setBackendHost(candidate);
+          setTempIpInput(candidate);
+          saveHostPreference(candidate); // ganti alamat lama agar tidak dicoba (dan timeout) lagi tiap buka app
           return;
         } catch (_) {}
       }
